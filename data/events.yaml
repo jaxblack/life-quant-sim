@@ -1,0 +1,1273 @@
+# life-quant-sim R2 — 事件库 (events library)
+# 字段定义见 docs/event-schema.md
+# 共 146 条事件，覆盖 6 stage × 10 category（每 cell ≥ 2 条）
+# 价向分布：negative=64 / positive=82 / neutral=0
+---
+- id: love.parent_affection
+  stage: childhood
+  category: love
+  valence: 4
+  prob_base: 0.95
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 2}
+  triggers: []
+  tags:
+    - formative
+    - attachment
+- id: love.childhood_crush
+  stage: childhood
+  category: love
+  valence: 2
+  prob_base: 0.7
+  impact_dims: {money: 0, social: 1, meaning: 1, energy: 0}
+  triggers: []
+  tags:
+    - puppy_love
+    - first_time
+- id: career.first_hobby_discovered
+  stage: childhood
+  category: career
+  valence: 3
+  prob_base: 0.65
+  impact_dims: {money: 0, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - formative
+- id: career.school_contest_win
+  stage: childhood
+  category: career
+  valence: 4
+  prob_base: 0.25
+  impact_dims: {money: 0, social: 2, meaning: 2, energy: 0}
+  triggers: []
+  tags:
+    - first_time
+- id: family.sibling_born
+  stage: childhood
+  category: family
+  valence: 2
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 2, meaning: 1, energy: -1}
+  triggers: []
+  tags:
+    - formative
+- id: family.parents_divorce_child
+  stage: childhood
+  category: family
+  valence: -4
+  prob_base: 0.18
+  impact_dims: {money: 0, social: -2, meaning: -2, energy: -2}
+  triggers: []
+  tags:
+    - formative
+    - irreversible
+- id: family.family_vacation_joy
+  stage: childhood
+  category: family
+  valence: 3
+  prob_base: 0.75
+  impact_dims: {money: 0, social: 1, meaning: 2, energy: 2}
+  triggers: []
+  tags:
+    - recurrent
+- id: health.vaccinated_routine
+  stage: childhood
+  category: health
+  valence: 1
+  prob_base: 0.98
+  impact_dims: {money: 0, social: 0, meaning: 0, energy: 1}
+  triggers: []
+  tags:
+    - routine
+- id: health.serious_illness_kid
+  stage: childhood
+  category: health
+  valence: -4
+  prob_base: 0.1
+  impact_dims: {money: -2, social: 0, meaning: -1, energy: -3}
+  triggers: []
+  tags:
+    - formative
+- id: finance.piggy_bank_first
+  stage: childhood
+  category: finance
+  valence: 1
+  prob_base: 0.8
+  impact_dims: {money: 1, social: 0, meaning: 1, energy: 0}
+  triggers: []
+  tags:
+    - first_time
+- id: finance.family_hardship_kid
+  stage: childhood
+  category: finance
+  valence: -3
+  prob_base: 0.2
+  impact_dims: {money: -3, social: -1, meaning: 0, energy: -1}
+  triggers: []
+  tags:
+    - formative
+- id: social.best_friend_made
+  stage: childhood
+  category: social
+  valence: 4
+  prob_base: 0.85
+  impact_dims: {money: 0, social: 3, meaning: 2, energy: 0}
+  triggers: []
+  tags:
+    - formative
+    - first_time
+- id: social.bullying_victim
+  stage: childhood
+  category: social
+  valence: -4
+  prob_base: 0.22
+  impact_dims: {money: 0, social: -3, meaning: -2, energy: -2}
+  triggers: []
+  tags:
+    - formative
+- id: social.pet_companion
+  stage: childhood
+  category: social
+  valence: 3
+  prob_base: 0.55
+  impact_dims: {money: 0, social: 1, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - attachment
+- id: cognition.learn_to_read
+  stage: childhood
+  category: cognition
+  valence: 3
+  prob_base: 0.95
+  impact_dims: {money: 0, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - milestone
+- id: cognition.learning_disability
+  stage: childhood
+  category: cognition
+  valence: -2
+  prob_base: 0.08
+  impact_dims: {money: 0, social: 0, meaning: -1, energy: -1}
+  triggers: []
+  tags:
+    - formative
+- id: emotion.first_joy_memory
+  stage: childhood
+  category: emotion
+  valence: 2
+  prob_base: 0.9
+  impact_dims: {money: 0, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - formative
+- id: emotion.early_trauma
+  stage: childhood
+  category: emotion
+  valence: -4
+  prob_base: 0.12
+  impact_dims: {money: 0, social: -1, meaning: -3, energy: -3}
+  triggers: []
+  tags:
+    - formative
+    - irreversible
+- id: crisis.accident_injury_kid
+  stage: childhood
+  category: crisis
+  valence: -3
+  prob_base: 0.15
+  impact_dims: {money: -1, social: 0, meaning: 0, energy: -2}
+  triggers: []
+  tags: []
+- id: crisis.natural_disaster_kid
+  stage: childhood
+  category: crisis
+  valence: -4
+  prob_base: 0.05
+  impact_dims: {money: -3, social: -1, meaning: -1, energy: -2}
+  triggers: []
+  tags:
+    - formative
+- id: opportunity.discover_talent
+  stage: childhood
+  category: opportunity
+  valence: 4
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 0, meaning: 3, energy: 2}
+  triggers: []
+  tags:
+    - formative
+- id: opportunity.scholarship_kid
+  stage: childhood
+  category: opportunity
+  valence: 3
+  prob_base: 0.08
+  impact_dims: {money: 2, social: 1, meaning: 2, energy: 0}
+  triggers: []
+  tags: []
+- id: love.first_crush
+  stage: adolescence
+  category: love
+  valence: 3
+  prob_base: 0.85
+  impact_dims: {money: 0, social: 1, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - puppy_love
+    - first_time
+- id: love.first_breakup
+  stage: adolescence
+  category: love
+  valence: -3
+  prob_base: 0.55
+  impact_dims: {money: 0, social: -1, meaning: -2, energy: -2}
+  triggers:
+    - love.first_crush
+  tags:
+    - formative
+- id: love.confession_rejected
+  stage: adolescence
+  category: love
+  valence: -3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: -1, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: career.idea_sprout
+  stage: adolescence
+  category: career
+  valence: 2
+  prob_base: 0.55
+  impact_dims: {money: 0, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags: []
+- id: career.failed_exam
+  stage: adolescence
+  category: career
+  valence: -2
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 0, meaning: -1, energy: -1}
+  triggers: []
+  tags:
+    - recurrent
+- id: family.leave_for_boarding
+  stage: adolescence
+  category: family
+  valence: -1
+  prob_base: 0.2
+  impact_dims: {money: 0, social: -1, meaning: 1, energy: -1}
+  triggers: []
+  tags: []
+- id: family.parent_supports_dream
+  stage: adolescence
+  category: family
+  valence: 3
+  prob_base: 0.55
+  impact_dims: {money: 0, social: 1, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: health.puberty_smooth
+  stage: adolescence
+  category: health
+  valence: 2
+  prob_base: 0.6
+  impact_dims: {money: 0, social: 0, meaning: 1, energy: 2}
+  triggers: []
+  tags:
+    - milestone
+- id: health.mental_health_crisis
+  stage: adolescence
+  category: health
+  valence: -4
+  prob_base: 0.18
+  impact_dims: {money: 0, social: -2, meaning: -2, energy: -3}
+  triggers: []
+  tags:
+    - formative
+- id: health.sports_injury
+  stage: adolescence
+  category: health
+  valence: -2
+  prob_base: 0.25
+  impact_dims: {money: -1, social: 0, meaning: 0, energy: -2}
+  triggers: []
+  tags: []
+- id: finance.first_part_time_job
+  stage: adolescence
+  category: finance
+  valence: 2
+  prob_base: 0.55
+  impact_dims: {money: 1, social: 0, meaning: 2, energy: -1}
+  triggers: []
+  tags:
+    - first_time
+- id: finance.gambling_debt_youth
+  stage: adolescence
+  category: finance
+  valence: -3
+  prob_base: 0.05
+  impact_dims: {money: -2, social: -1, meaning: -1, energy: 0}
+  triggers: []
+  tags: []
+- id: social.peer_group_joined
+  stage: adolescence
+  category: social
+  valence: 3
+  prob_base: 0.8
+  impact_dims: {money: 0, social: 3, meaning: 1, energy: 1}
+  triggers: []
+  tags:
+    - formative
+- id: social.social_isolation_teen
+  stage: adolescence
+  category: social
+  valence: -3
+  prob_base: 0.18
+  impact_dims: {money: 0, social: -3, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: cognition.passion_subject
+  stage: adolescence
+  category: cognition
+  valence: 4
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 0, meaning: 3, energy: 2}
+  triggers: []
+  tags:
+    - formative
+- id: cognition.academic_burnout
+  stage: adolescence
+  category: cognition
+  valence: -3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 0, meaning: -2, energy: -2}
+  triggers: []
+  tags: []
+- id: emotion.identity_awakening
+  stage: adolescence
+  category: emotion
+  valence: 3
+  prob_base: 0.7
+  impact_dims: {money: 0, social: 0, meaning: 3, energy: 1}
+  triggers: []
+  tags:
+    - formative
+    - milestone
+- id: emotion.depression_onset
+  stage: adolescence
+  category: emotion
+  valence: -4
+  prob_base: 0.12
+  impact_dims: {money: 0, social: -1, meaning: -3, energy: -3}
+  triggers: []
+  tags:
+    - formative
+- id: crisis.parent_death_teen
+  stage: adolescence
+  category: crisis
+  valence: -5
+  prob_base: 0.04
+  impact_dims: {money: -1, social: -2, meaning: -3, energy: -3}
+  triggers: []
+  tags:
+    - irreversible
+    - formative
+- id: crisis.school_dropout
+  stage: adolescence
+  category: crisis
+  valence: -3
+  prob_base: 0.06
+  impact_dims: {money: -1, social: -1, meaning: -2, energy: 0}
+  triggers: []
+  tags:
+    - formative
+- id: opportunity.top_school_admit
+  stage: adolescence
+  category: opportunity
+  valence: 4
+  prob_base: 0.1
+  impact_dims: {money: 1, social: 2, meaning: 3, energy: 0}
+  triggers: []
+  tags:
+    - formative
+- id: opportunity.olympic_talent
+  stage: adolescence
+  category: opportunity
+  valence: 4
+  prob_base: 0.02
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: opportunity.travel_abroad_teen
+  stage: adolescence
+  category: opportunity
+  valence: 4
+  prob_base: 0.15
+  impact_dims: {money: -1, social: 2, meaning: 3, energy: 1}
+  triggers: []
+  tags:
+    - formative
+- id: love.first_real_relationship
+  stage: early_adult
+  category: love
+  valence: 4
+  prob_base: 0.8
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 1}
+  triggers: []
+  tags:
+    - first_time
+- id: love.engagement
+  stage: early_adult
+  category: love
+  valence: 4
+  prob_base: 0.5
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 1}
+  triggers:
+    - love.first_real_relationship
+  tags:
+    - milestone
+- id: love.engagement_broken
+  stage: early_adult
+  category: love
+  valence: -4
+  prob_base: 0.12
+  impact_dims: {money: -1, social: -1, meaning: -3, energy: -2}
+  triggers:
+    - love.engagement
+  tags: []
+- id: love.marriage
+  stage: early_adult
+  category: love
+  valence: 5
+  prob_base: 0.55
+  impact_dims: {money: -1, social: 3, meaning: 4, energy: 1}
+  triggers:
+    - love.engagement
+  tags:
+    - milestone
+- id: career.first_job
+  stage: early_adult
+  category: career
+  valence: 3
+  prob_base: 0.92
+  impact_dims: {money: 2, social: 1, meaning: 2, energy: -1}
+  triggers: []
+  tags:
+    - first_time
+    - milestone
+- id: career.promotion_first
+  stage: early_adult
+  category: career
+  valence: 4
+  prob_base: 0.45
+  impact_dims: {money: 2, social: 2, meaning: 3, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+- id: career.layoff_first
+  stage: early_adult
+  category: career
+  valence: -4
+  prob_base: 0.18
+  impact_dims: {money: -3, social: -1, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: career.career_change
+  stage: early_adult
+  category: career
+  valence: 2
+  prob_base: 0.25
+  impact_dims: {money: -1, social: -1, meaning: 2, energy: -1}
+  triggers: []
+  tags: []
+- id: career.mentor_found
+  stage: early_adult
+  category: career
+  valence: 3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: family.become_parent
+  stage: early_adult
+  category: family
+  valence: 4
+  prob_base: 0.55
+  impact_dims: {money: -2, social: 2, meaning: 4, energy: -2}
+  triggers: []
+  tags:
+    - milestone
+    - formative
+- id: family.pregnancy_loss
+  stage: early_adult
+  category: family
+  valence: -5
+  prob_base: 0.1
+  impact_dims: {money: 0, social: -1, meaning: -4, energy: -3}
+  triggers: []
+  tags:
+    - irreversible
+- id: health.peak_fitness
+  stage: early_adult
+  category: health
+  valence: 3
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 0, meaning: 1, energy: 3}
+  triggers: []
+  tags: []
+- id: health.chronic_illness_dx
+  stage: early_adult
+  category: health
+  valence: -3
+  prob_base: 0.12
+  impact_dims: {money: -2, social: 0, meaning: -1, energy: -2}
+  triggers: []
+  tags:
+    - irreversible
+- id: finance.first_salary
+  stage: early_adult
+  category: finance
+  valence: 3
+  prob_base: 0.95
+  impact_dims: {money: 3, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - first_time
+- id: finance.debt_trap_young
+  stage: early_adult
+  category: finance
+  valence: -3
+  prob_base: 0.2
+  impact_dims: {money: -3, social: 0, meaning: -1, energy: -1}
+  triggers: []
+  tags: []
+- id: finance.buy_first_home
+  stage: early_adult
+  category: finance
+  valence: 4
+  prob_base: 0.3
+  impact_dims: {money: -2, social: 1, meaning: 3, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+    - first_time
+- id: social.pro_network_formed
+  stage: early_adult
+  category: social
+  valence: 3
+  prob_base: 0.6
+  impact_dims: {money: 0, social: 3, meaning: 1, energy: 1}
+  triggers: []
+  tags: []
+- id: social.lose_best_friend
+  stage: early_adult
+  category: social
+  valence: -3
+  prob_base: 0.2
+  impact_dims: {money: 0, social: -2, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: cognition.graduate_degree
+  stage: early_adult
+  category: cognition
+  valence: 3
+  prob_base: 0.3
+  impact_dims: {money: -1, social: 1, meaning: 3, energy: -1}
+  triggers: []
+  tags:
+    - milestone
+- id: cognition.imposter_syndrome
+  stage: early_adult
+  category: cognition
+  valence: -2
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 0, meaning: -2, energy: -1}
+  triggers: []
+  tags:
+    - recurrent
+- id: emotion.quarter_life_crisis
+  stage: early_adult
+  category: emotion
+  valence: -2
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 0, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: emotion.find_meaning_project
+  stage: early_adult
+  category: emotion
+  valence: 4
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 0, meaning: 4, energy: 2}
+  triggers: []
+  tags: []
+- id: crisis.serious_accident_ea
+  stage: early_adult
+  category: crisis
+  valence: -4
+  prob_base: 0.08
+  impact_dims: {money: -2, social: 0, meaning: -1, energy: -3}
+  triggers: []
+  tags: []
+- id: crisis.startup_bankruptcy
+  stage: early_adult
+  category: crisis
+  valence: -4
+  prob_base: 0.06
+  impact_dims: {money: -4, social: -1, meaning: -2, energy: -2}
+  triggers: []
+  tags: []
+- id: opportunity.viral_creator
+  stage: early_adult
+  category: opportunity
+  valence: 4
+  prob_base: 0.03
+  impact_dims: {money: 3, social: 4, meaning: 2, energy: 0}
+  triggers: []
+  tags: []
+- id: opportunity.inheritance_ea
+  stage: early_adult
+  category: opportunity
+  valence: 3
+  prob_base: 0.05
+  impact_dims: {money: 4, social: 0, meaning: 1, energy: 0}
+  triggers: []
+  tags: []
+- id: opportunity.first_anniversary
+  stage: early_adult
+  category: opportunity
+  valence: 3
+  prob_base: 0.5
+  impact_dims: {money: 0, social: 1, meaning: 3, energy: 1}
+  triggers:
+    - love.marriage
+  tags:
+    - recurrent
+- id: love.marriage_stable
+  stage: mid_adult
+  category: love
+  valence: 3
+  prob_base: 0.6
+  impact_dims: {money: 0, social: 1, meaning: 3, energy: 1}
+  triggers:
+    - love.marriage
+  tags:
+    - recurrent
+- id: love.divorce_mid
+  stage: mid_adult
+  category: love
+  valence: -4
+  prob_base: 0.22
+  impact_dims: {money: -3, social: -2, meaning: -3, energy: -2}
+  triggers:
+    - love.marriage
+  tags:
+    - irreversible
+- id: love.affair_discovered
+  stage: mid_adult
+  category: love
+  valence: -5
+  prob_base: 0.1
+  impact_dims: {money: 0, social: -2, meaning: -4, energy: -3}
+  triggers: []
+  tags: []
+- id: career.peak_achievement
+  stage: mid_adult
+  category: career
+  valence: 5
+  prob_base: 0.25
+  impact_dims: {money: 4, social: 3, meaning: 4, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+- id: career.midcareer_burnout
+  stage: mid_adult
+  category: career
+  valence: -3
+  prob_base: 0.35
+  impact_dims: {money: 0, social: 0, meaning: -3, energy: -3}
+  triggers: []
+  tags: []
+- id: career.forced_pivot
+  stage: mid_adult
+  category: career
+  valence: -2
+  prob_base: 0.18
+  impact_dims: {money: -2, social: 0, meaning: -1, energy: -1}
+  triggers: []
+  tags: []
+- id: career.second_wind
+  stage: mid_adult
+  category: career
+  valence: 3
+  prob_base: 0.2
+  impact_dims: {money: 1, social: 0, meaning: 3, energy: 2}
+  triggers: []
+  tags: []
+- id: family.child_enters_school
+  stage: mid_adult
+  category: family
+  valence: 3
+  prob_base: 0.55
+  impact_dims: {money: -1, social: 1, meaning: 2, energy: -1}
+  triggers:
+    - family.become_parent
+  tags:
+    - milestone
+- id: family.teen_conflict
+  stage: mid_adult
+  category: family
+  valence: -2
+  prob_base: 0.5
+  impact_dims: {money: 0, social: -1, meaning: -1, energy: -1}
+  triggers: []
+  tags:
+    - recurrent
+- id: family.parent_caregiving
+  stage: mid_adult
+  category: family
+  valence: -2
+  prob_base: 0.4
+  impact_dims: {money: -2, social: 0, meaning: 1, energy: -2}
+  triggers: []
+  tags: []
+- id: health.midlife_checkup_clear
+  stage: mid_adult
+  category: health
+  valence: 2
+  prob_base: 0.55
+  impact_dims: {money: 0, social: 0, meaning: 1, energy: 1}
+  triggers: []
+  tags:
+    - routine
+- id: health.cancer_diagnosis_mid
+  stage: mid_adult
+  category: health
+  valence: -5
+  prob_base: 0.08
+  impact_dims: {money: -3, social: -1, meaning: -3, energy: -4}
+  triggers: []
+  tags:
+    - irreversible
+- id: health.weight_loss_success
+  stage: mid_adult
+  category: health
+  valence: 3
+  prob_base: 0.2
+  impact_dims: {money: 0, social: 1, meaning: 2, energy: 2}
+  triggers: []
+  tags: []
+- id: finance.financial_stability
+  stage: mid_adult
+  category: finance
+  valence: 3
+  prob_base: 0.5
+  impact_dims: {money: 3, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags:
+    - milestone
+- id: finance.investment_loss
+  stage: mid_adult
+  category: finance
+  valence: -3
+  prob_base: 0.25
+  impact_dims: {money: -3, social: 0, meaning: -1, energy: -1}
+  triggers: []
+  tags: []
+- id: finance.mortgage_paid_off
+  stage: mid_adult
+  category: finance
+  valence: 4
+  prob_base: 0.2
+  impact_dims: {money: 3, social: 0, meaning: 3, energy: 1}
+  triggers:
+    - finance.buy_first_home
+  tags:
+    - milestone
+- id: social.community_leader
+  stage: mid_adult
+  category: social
+  valence: 3
+  prob_base: 0.2
+  impact_dims: {money: 0, social: 3, meaning: 3, energy: -1}
+  triggers: []
+  tags: []
+- id: social.social_withdrawal_mid
+  stage: mid_adult
+  category: social
+  valence: -2
+  prob_base: 0.25
+  impact_dims: {money: 0, social: -2, meaning: -1, energy: -1}
+  triggers: []
+  tags: []
+- id: cognition.midlife_wisdom
+  stage: mid_adult
+  category: cognition
+  valence: 3
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 1, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: cognition.memory_decline_early
+  stage: mid_adult
+  category: cognition
+  valence: -2
+  prob_base: 0.18
+  impact_dims: {money: 0, social: 0, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: emotion.midlife_crisis
+  stage: mid_adult
+  category: emotion
+  valence: -3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: -1, meaning: -3, energy: -2}
+  triggers: []
+  tags:
+    - formative
+- id: emotion.spiritual_awakening
+  stage: mid_adult
+  category: emotion
+  valence: 4
+  prob_base: 0.15
+  impact_dims: {money: 0, social: 1, meaning: 4, energy: 2}
+  triggers: []
+  tags: []
+- id: emotion.sabbatical_travel
+  stage: mid_adult
+  category: emotion
+  valence: 3
+  prob_base: 0.1
+  impact_dims: {money: -2, social: 1, meaning: 3, energy: 2}
+  triggers: []
+  tags: []
+- id: crisis.major_lawsuit
+  stage: mid_adult
+  category: crisis
+  valence: -4
+  prob_base: 0.05
+  impact_dims: {money: -3, social: -2, meaning: -1, energy: -2}
+  triggers: []
+  tags: []
+- id: crisis.disaster_home_loss
+  stage: mid_adult
+  category: crisis
+  valence: -5
+  prob_base: 0.03
+  impact_dims: {money: -4, social: -1, meaning: -2, energy: -3}
+  triggers: []
+  tags:
+    - irreversible
+- id: opportunity.book_published
+  stage: mid_adult
+  category: opportunity
+  valence: 4
+  prob_base: 0.04
+  impact_dims: {money: 1, social: 3, meaning: 4, energy: -1}
+  triggers: []
+  tags:
+    - milestone
+- id: opportunity.business_breakthrough
+  stage: mid_adult
+  category: opportunity
+  valence: 5
+  prob_base: 0.05
+  impact_dims: {money: 5, social: 3, meaning: 4, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+- id: love.long_anniversary
+  stage: late_adult
+  category: love
+  valence: 4
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 1}
+  triggers:
+    - love.marriage_stable
+  tags:
+    - milestone
+    - recurrent
+- id: love.spouse_illness
+  stage: late_adult
+  category: love
+  valence: -4
+  prob_base: 0.3
+  impact_dims: {money: -2, social: 0, meaning: -3, energy: -3}
+  triggers: []
+  tags: []
+- id: love.late_partnership
+  stage: late_adult
+  category: love
+  valence: 3
+  prob_base: 0.08
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: career.pre_retire_peak
+  stage: late_adult
+  category: career
+  valence: 3
+  prob_base: 0.4
+  impact_dims: {money: 2, social: 2, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: career.forced_early_retire
+  stage: late_adult
+  category: career
+  valence: -2
+  prob_base: 0.2
+  impact_dims: {money: -2, social: -1, meaning: -2, energy: 0}
+  triggers: []
+  tags: []
+- id: career.mentorship_role
+  stage: late_adult
+  category: career
+  valence: 3
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: -1}
+  triggers: []
+  tags: []
+- id: family.grandchild_born
+  stage: late_adult
+  category: family
+  valence: 5
+  prob_base: 0.55
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 1}
+  triggers: []
+  tags:
+    - milestone
+- id: family.adult_child_estrange
+  stage: late_adult
+  category: family
+  valence: -4
+  prob_base: 0.1
+  impact_dims: {money: 0, social: -2, meaning: -4, energy: -2}
+  triggers: []
+  tags:
+    - irreversible
+- id: health.chronic_disease_mgmt
+  stage: late_adult
+  category: health
+  valence: 1
+  prob_base: 0.55
+  impact_dims: {money: -2, social: 0, meaning: 1, energy: -1}
+  triggers: []
+  tags:
+    - recurrent
+- id: health.heart_attack_late
+  stage: late_adult
+  category: health
+  valence: -4
+  prob_base: 0.1
+  impact_dims: {money: -3, social: 0, meaning: -2, energy: -4}
+  triggers: []
+  tags: []
+- id: health.successful_surgery
+  stage: late_adult
+  category: health
+  valence: 3
+  prob_base: 0.3
+  impact_dims: {money: -2, social: 0, meaning: 2, energy: 2}
+  triggers: []
+  tags: []
+- id: finance.retirement_adequate
+  stage: late_adult
+  category: finance
+  valence: 3
+  prob_base: 0.55
+  impact_dims: {money: 3, social: 0, meaning: 3, energy: 1}
+  triggers: []
+  tags:
+    - milestone
+- id: finance.pension_issues
+  stage: late_adult
+  category: finance
+  valence: -3
+  prob_base: 0.15
+  impact_dims: {money: -3, social: -1, meaning: -1, energy: -1}
+  triggers: []
+  tags: []
+- id: finance.legacy_planning
+  stage: late_adult
+  category: finance
+  valence: 3
+  prob_base: 0.45
+  impact_dims: {money: -1, social: 1, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: social.elder_respected
+  stage: late_adult
+  category: social
+  valence: 3
+  prob_base: 0.5
+  impact_dims: {money: 0, social: 3, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: social.peer_death_cluster
+  stage: late_adult
+  category: social
+  valence: -3
+  prob_base: 0.4
+  impact_dims: {money: 0, social: -2, meaning: -2, energy: -1}
+  triggers: []
+  tags:
+    - recurrent
+- id: cognition.reserve_maintained
+  stage: late_adult
+  category: cognition
+  valence: 3
+  prob_base: 0.45
+  impact_dims: {money: 0, social: 0, meaning: 2, energy: 1}
+  triggers: []
+  tags: []
+- id: cognition.early_dementia_sign
+  stage: late_adult
+  category: cognition
+  valence: -3
+  prob_base: 0.08
+  impact_dims: {money: 0, social: -1, meaning: -3, energy: -1}
+  triggers: []
+  tags:
+    - irreversible
+- id: emotion.generativity_satisfy
+  stage: late_adult
+  category: emotion
+  valence: 4
+  prob_base: 0.5
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 0}
+  triggers: []
+  tags: []
+- id: emotion.regret_rumination
+  stage: late_adult
+  category: emotion
+  valence: -3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 0, meaning: -3, energy: -2}
+  triggers: []
+  tags:
+    - recurrent
+- id: crisis.stroke_survival
+  stage: late_adult
+  category: crisis
+  valence: -3
+  prob_base: 0.07
+  impact_dims: {money: -3, social: 0, meaning: -1, energy: -3}
+  triggers: []
+  tags: []
+- id: crisis.spouse_death_late
+  stage: late_adult
+  category: crisis
+  valence: -5
+  prob_base: 0.12
+  impact_dims: {money: -1, social: -3, meaning: -4, energy: -3}
+  triggers: []
+  tags:
+    - irreversible
+    - formative
+- id: opportunity.late_reinvention
+  stage: late_adult
+  category: opportunity
+  valence: 4
+  prob_base: 0.1
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 2}
+  triggers: []
+  tags: []
+- id: opportunity.inheritance_late
+  stage: late_adult
+  category: opportunity
+  valence: 3
+  prob_base: 0.15
+  impact_dims: {money: 4, social: 0, meaning: 1, energy: 0}
+  triggers: []
+  tags: []
+- id: opportunity.hobby_mastery
+  stage: late_adult
+  category: opportunity
+  valence: 3
+  prob_base: 0.25
+  impact_dims: {money: 0, social: 1, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: love.companionship_golden
+  stage: old_age
+  category: love
+  valence: 3
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: love.widowhood
+  stage: old_age
+  category: love
+  valence: -4
+  prob_base: 0.45
+  impact_dims: {money: 0, social: -3, meaning: -3, energy: -3}
+  triggers: []
+  tags:
+    - irreversible
+- id: career.emeritus_recognition
+  stage: old_age
+  category: career
+  valence: 3
+  prob_base: 0.1
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 0}
+  triggers: []
+  tags: []
+- id: career.unable_to_work
+  stage: old_age
+  category: career
+  valence: -2
+  prob_base: 0.65
+  impact_dims: {money: -1, social: -1, meaning: -2, energy: 0}
+  triggers: []
+  tags:
+    - irreversible
+- id: family.great_grandchild
+  stage: old_age
+  category: family
+  valence: 4
+  prob_base: 0.25
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+- id: family.institutionalized
+  stage: old_age
+  category: family
+  valence: -2
+  prob_base: 0.3
+  impact_dims: {money: -3, social: -2, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: health.longevity_blessing
+  stage: old_age
+  category: health
+  valence: 3
+  prob_base: 0.3
+  impact_dims: {money: 0, social: 0, meaning: 3, energy: 2}
+  triggers: []
+  tags: []
+- id: health.terminal_diagnosis
+  stage: old_age
+  category: health
+  valence: -5
+  prob_base: 0.25
+  impact_dims: {money: -2, social: -1, meaning: -3, energy: -4}
+  triggers: []
+  tags:
+    - irreversible
+- id: health.fall_fracture
+  stage: old_age
+  category: health
+  valence: -3
+  prob_base: 0.3
+  impact_dims: {money: -2, social: 0, meaning: -1, energy: -3}
+  triggers: []
+  tags: []
+- id: finance.financial_security_old
+  stage: old_age
+  category: finance
+  valence: 3
+  prob_base: 0.45
+  impact_dims: {money: 3, social: 0, meaning: 3, energy: 1}
+  triggers: []
+  tags: []
+- id: finance.elder_scam
+  stage: old_age
+  category: finance
+  valence: -3
+  prob_base: 0.1
+  impact_dims: {money: -3, social: -1, meaning: -2, energy: 0}
+  triggers: []
+  tags: []
+- id: social.senior_community
+  stage: old_age
+  category: social
+  valence: 3
+  prob_base: 0.4
+  impact_dims: {money: 0, social: 3, meaning: 2, energy: 1}
+  triggers: []
+  tags: []
+- id: social.isolation_old
+  stage: old_age
+  category: social
+  valence: -4
+  prob_base: 0.3
+  impact_dims: {money: 0, social: -3, meaning: -3, energy: -2}
+  triggers: []
+  tags: []
+- id: cognition.late_wisdom_contrib
+  stage: old_age
+  category: cognition
+  valence: 4
+  prob_base: 0.25
+  impact_dims: {money: 0, social: 2, meaning: 4, energy: 0}
+  triggers: []
+  tags: []
+- id: cognition.dementia_advance
+  stage: old_age
+  category: cognition
+  valence: -4
+  prob_base: 0.18
+  impact_dims: {money: 0, social: -2, meaning: -4, energy: -2}
+  triggers: []
+  tags:
+    - irreversible
+- id: emotion.ego_integrity
+  stage: old_age
+  category: emotion
+  valence: 5
+  prob_base: 0.35
+  impact_dims: {money: 0, social: 1, meaning: 5, energy: 1}
+  triggers: []
+  tags:
+    - milestone
+- id: emotion.late_despair
+  stage: old_age
+  category: emotion
+  valence: -4
+  prob_base: 0.25
+  impact_dims: {money: 0, social: -1, meaning: -4, energy: -2}
+  triggers: []
+  tags: []
+- id: crisis.nursing_home_transfer
+  stage: old_age
+  category: crisis
+  valence: -3
+  prob_base: 0.35
+  impact_dims: {money: -3, social: -2, meaning: -2, energy: -1}
+  triggers: []
+  tags: []
+- id: crisis.terminal_illness
+  stage: old_age
+  category: crisis
+  valence: -5
+  prob_base: 0.3
+  impact_dims: {money: -2, social: -1, meaning: -3, energy: -4}
+  triggers: []
+  tags:
+    - irreversible
+- id: opportunity.legacy_completion
+  stage: old_age
+  category: opportunity
+  valence: 4
+  prob_base: 0.25
+  impact_dims: {money: 0, social: 2, meaning: 5, energy: 0}
+  triggers: []
+  tags:
+    - milestone
+- id: opportunity.reunion_long_lost
+  stage: old_age
+  category: opportunity
+  valence: 3
+  prob_base: 0.1
+  impact_dims: {money: 0, social: 2, meaning: 3, energy: 0}
+  triggers: []
+  tags: []
+- id: opportunity.memoir_writing
+  stage: old_age
+  category: opportunity
+  valence: 3
+  prob_base: 0.15
+  impact_dims: {money: 0, social: 1, meaning: 4, energy: -1}
+  triggers: []
+  tags: []
