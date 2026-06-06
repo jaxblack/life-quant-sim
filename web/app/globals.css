@@ -144,3 +144,47 @@ video {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* —— 轻量动画：CSS transition / fade-in（不做人物成长动画） —— */
+@keyframes lqs-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lqs-fade-in {
+  animation: lqs-fade-in 220ms ease-out both;
+}
+.lqs-track-tab,
+.lqs-chip,
+.lqs-status-card {
+  transition: background-color 200ms ease, color 200ms ease,
+    border-color 200ms ease, transform 150ms ease;
+}
+.lqs-chip:hover {
+  transform: translateY(-1px);
+}
+.lqs-status-cards {
+  /* 在小屏上压缩为两列，保持各卡可读，依然使用过渡动画。 */
+  max-width: 100%;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .lqs-status-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* 尊重减少动画偏好：禁用 fade-in 与 transition。 */
+  .lqs-fade-in,
+  .lqs-track-tab,
+  .lqs-chip,
+  .lqs-status-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}
