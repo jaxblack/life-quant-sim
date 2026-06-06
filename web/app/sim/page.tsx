@@ -337,6 +337,9 @@ export default function SimPage() {
     )
   }
 
+  // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
+  // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
+  const FUTURE_HORIZON_YEARS = 10
   const visibleWindows = useMemo(() => {
     const byTalent = OPPORTUNITY_WINDOWS.filter((w) =>
       w.talents.some((t) => selectedTalents.includes(t))
@@ -344,13 +347,22 @@ export default function SimPage() {
     const withMissed = showMissed
       ? byTalent
       : byTalent.filter((w) => classifyWindow(age, w) !== 'missed')
+    // 未来10年过滤：upcoming 状态的窗口若起点超过 age + 10，则不以"即将到来"展示。
+    // current / closing 已在窗口内（或将在 ≤3 年内结束），天然落在 10 年内，无需额外过滤。
+    const withinHorizon = withMissed.filter((w) => {
+      const status = classifyWindow(age, w)
+      if (status === 'upcoming') {
+        return w.ageStart - age <= FUTURE_HORIZON_YEARS
+      }
+      return true
+    })
     const order: Record<OpportunityStatus, number> = {
       closing: 0,
       current: 1,
       upcoming: 2,
       missed: 3,
     }
-    return [...withMissed].sort((a, b) => {
+    return [...withinHorizon].sort((a, b) => {
       const sa = order[classifyWindow(age, a)]
       const sb = order[classifyWindow(age, b)]
       if (sa !== sb) return sa - sb
@@ -638,12 +650,12 @@ export default function SimPage() {
                 当前阶段即将错过的人生窗口 · 机会成本
               </h2>
               <p style={{ margin: 0, color: '#6b7280', fontSize: 13, lineHeight: 1.7 }}>
-                以当前年龄 <strong>{age} 岁</strong> 为参考点，按"个人天赋"筛选当下最该抓住的机会窗口：
+                以当前年龄 <strong>{age} 岁</strong> 为参考点，按"个人天赋"筛选<strong>未来10年</strong>内最该抓住的机会窗口：
                 <span style={{ color: '#b91c1c', fontWeight: 600 }}> 即将错过</span>、
                 <span style={{ color: '#047857' }}> 当前可选</span>、
                 <span style={{ color: '#1d4ed8' }}> 即将到来</span>、
                 <span style={{ color: '#6b7280' }}> 已关闭</span>。
-                "已关闭"窗口默认隐藏，可在筛选区切换查看长期机会成本回顾。
+                "即将到来"仅展示<strong>未来10年</strong>内可触达的窗口；更远的窗口不在当前关注列表。"已关闭"窗口默认隐藏，可在筛选区切换查看长期机会成本回顾。
               </p>
             </div>
 
