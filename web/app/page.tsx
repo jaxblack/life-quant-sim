@@ -5,12 +5,12 @@ export default function HomePage() {
     <section style={{ display: 'grid', gap: 24 }}>
       <div>
         <h1 style={{ fontSize: 48, marginBottom: 12 }}>量化人生模拟器</h1>
-        <p style={{ fontSize: 20, color: '#4b5563' }}>模拟从 0 到 100 岁,看清人生这条长坡道</p>
+        <p style={{ fontSize: 20, color: '#4b5563' }}>0-100岁 全程时间轴上的人生模拟</p>
       </div>
       <div style={{ lineHeight: 1.8, color: '#374151' }}>
         <p>把人生拆成可观察的阶段,用模型理解教育、职业、健康与财富的长期影响。</p>
         <p>它不是命运预测器,而是一面帮助你看清变量与路径的镜子。</p>
-        <p>从出生背景到关键选择,每一次模拟都呈现不同的人生曲线。</p>
+        <p>从<strong>出生地域</strong>到<strong>出身家庭</strong>,每一次模拟都呈现不同的人生曲线。</p>
         <p>未来会接入真实 engine,让策略、随机性与长期反馈都可被量化比较。</p>
       </div>
       <div>
