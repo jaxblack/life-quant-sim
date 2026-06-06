@@ -1,6 +1,13 @@
 # life-quant-sim
 
-> 量化人生模拟器
+> 量化人生模拟器 —— 0-100岁时间轴上的人生模拟
+
+## 在线 Demo
+
+🔗 **GitHub Pages**: https://jaxblack.github.io/life-quant-sim/
+
+> 首次部署需要在仓库 `Settings → Pages → Build and deployment → Source` 中将来源切换为 **GitHub Actions**，
+> 之后每次推送到 `main` 都会通过 `.github/workflows/deploy.yml` 自动构建并发布。
 
 ## 愿景
 
@@ -12,14 +19,31 @@
 
 ## 项目状态
 
-🚧 **早期 scaffold（Phase 1）** —— 仅包含目录骨架、路线图与 schema 草案。尚未实现引擎与前端。
+🚧 **早期 scaffold（Phase 1）** —— 仅包含目录骨架、路线图与 schema 草案，前端为占位页面。引擎与真实模拟将在 R2 起逐步填充。
+
+## Quickstart
+
+### 在线访问
+
+直接打开 [GitHub Pages demo](https://jaxblack.github.io/life-quant-sim/) 即可，无需本地安装。
+
+### 本地预览
+
+```bash
+cd web
+npm install
+npm run dev          # 开发模式，http://localhost:3000
+# 或预览静态导出（与 GitHub Pages 实际构建一致）
+npm run build && npx serve out
+```
 
 ## 目录说明
 
 - `engine/` —— 模拟引擎（状态机 + 事件抽样 + 评分），R2 开始填充
-- `web/`    —— 前端可视化（Next.js 候选），R2 开始填充
+- `web/`    —— 前端可视化（Next.js App Router，静态导出至 GitHub Pages），R2 开始填充
 - `data/`   —— 事件库 / 初始条件分布 / 校准数据，R2 开始填充
 - `docs/`   —— 设计文档（路线图、心理学骨架、事件 schema）
+- `.github/workflows/deploy.yml` —— GitHub Pages 自动部署 workflow
 
 ## 下一步
 
