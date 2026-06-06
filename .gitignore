@@ -1,6 +1,8 @@
 # Node / 前端
 node_modules/
 .next/
+out/
+next-env.d.ts
 dist/
 build/
 
