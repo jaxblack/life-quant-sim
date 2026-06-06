@@ -1,0 +1,146 @@
+/* 基础重置 + 移动端横向溢出守门 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: #111827;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 共用：不让任何核心容器超出父级宽度 */
+.lqs-main,
+.lqs-header,
+.lqs-sim-grid,
+.lqs-cards,
+.lqs-sim-aside,
+.lqs-timeline {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* select 在 iOS 下默认有可能撑开父级，强制宽度 */
+.lqs-sim-aside select {
+  max-width: 100%;
+}
+
+/* —— 移动端断点（≤640px，覆盖 iPhone SE/375 等小屏） —— */
+@media (max-width: 640px) {
+  /* 顶部导航 */
+  .lqs-header {
+    padding: 12px 16px !important;
+  }
+  .lqs-header nav {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+  .lqs-header nav strong {
+    margin-right: 0 !important;
+    font-size: 15px !important;
+    flex-basis: 100%;
+  }
+
+  /* 主区内边距收紧，避免 24px 左右把内容挤出 */
+  .lqs-main {
+    padding: 20px 16px !important;
+  }
+
+  /* 首页 */
+  .lqs-home-title {
+    font-size: 30px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 8px !important;
+  }
+  .lqs-home-lede {
+    font-size: 16px !important;
+  }
+
+  /* 模拟页 */
+  .lqs-sim-title {
+    font-size: 22px !important;
+  }
+  .lqs-sim-lede {
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+  }
+
+  /* 左侧选择器 → 顶部堆叠（"顶部/折叠区"取顶部方案，保持桌面端布局不变） */
+  .lqs-sim-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .lqs-sim-aside {
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+  .lqs-sim-aside .lqs-aside-section {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  /* 时间轴卡片自身在小屏下也收紧 */
+  .lqs-timeline {
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  .lqs-timeline-head-age {
+    font-size: 16px !important;
+  }
+  .lqs-timeline-head-range {
+    font-size: 12px !important;
+  }
+  .lqs-timeline-bar {
+    height: 22px !important;
+  }
+  /* 阶段标签文字小屏更小，避免被裁切 */
+  .lqs-timeline-bar .lqs-stage-label {
+    font-size: 10px !important;
+  }
+
+  /* 四象限卡片：2 列保持信息密度，但缩小内边距与字号 */
+  .lqs-cards {
+    gap: 10px !important;
+  }
+  .lqs-cards > .lqs-card {
+    padding: 10px !important;
+  }
+  .lqs-cards .lqs-card-title {
+    font-size: 12px !important;
+  }
+  .lqs-cards .lqs-card-body {
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+  }
+
+  /* 情境提示 */
+  .lqs-context-hint {
+    padding: 12px !important;
+    font-size: 12px !important;
+    line-height: 1.65 !important;
+  }
+}
+
+/* —— 超窄屏（≤360px，老安卓/折叠机外屏） —— */
+@media (max-width: 360px) {
+  .lqs-home-title {
+    font-size: 26px !important;
+  }
+  .lqs-cards {
+    grid-template-columns: 1fr !important;
+  }
+}

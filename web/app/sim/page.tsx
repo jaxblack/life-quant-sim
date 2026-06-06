@@ -207,21 +207,23 @@ export default function SimPage() {
   return (
     <section style={{ display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 6 }}>
-        <h1 style={{ fontSize: 32, margin: 0 }}>人生模拟 Demo</h1>
-        <p style={{ color: '#6b7280', margin: 0, lineHeight: 1.7 }}>
-          0-100岁 全程时间轴 · 在左侧选择出生地域与出身家庭，再拖动滑块查看不同年龄段的成长 / 教育 / 职业 / 心理变化（demo 不做人物成长动画）。
+        <h1 className="lqs-sim-title" style={{ fontSize: 32, margin: 0 }}>人生模拟 Demo</h1>
+        <p className="lqs-sim-lede" style={{ color: '#6b7280', margin: 0, lineHeight: 1.7 }}>
+          0-100岁 全程时间轴 · 选择出生地域与出身家庭，再拖动滑块查看不同年龄段的成长 / 教育 / 职业 / 心理变化（demo 不做人物成长动画）。
         </p>
       </header>
 
       <div
+        className="lqs-sim-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(220px, 260px) 1fr',
           gap: 24,
         }}
       >
-        {/* 左侧选择面板 */}
+        {/* 左侧选择面板（小屏自动折到顶部） */}
         <aside
+          className="lqs-sim-aside"
           style={{
             display: 'grid',
             gap: 16,
@@ -232,7 +234,7 @@ export default function SimPage() {
             alignSelf: 'start',
           }}
         >
-          <div>
+          <div className="lqs-aside-section">
             <div style={{ fontWeight: 600, marginBottom: 8 }}>出生地域</div>
             <select
               value={regionId}
@@ -265,7 +267,7 @@ export default function SimPage() {
             </p>
           </div>
 
-          <div>
+          <div className="lqs-aside-section">
             <div style={{ fontWeight: 600, marginBottom: 8 }}>出身家庭</div>
             <select
               value={familyId}
@@ -303,6 +305,7 @@ export default function SimPage() {
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
           {/* 时间轴 */}
           <div
+            className="lqs-timeline"
             style={{
               padding: 16,
               border: '1px solid #e5e7eb',
@@ -321,10 +324,10 @@ export default function SimPage() {
                 gap: 8,
               }}
             >
-              <div style={{ fontSize: 18, fontWeight: 600 }}>
+              <div className="lqs-timeline-head-age" style={{ fontSize: 18, fontWeight: 600 }}>
                 {age} 岁 · {stage.name}
               </div>
-              <div style={{ color: '#6b7280', fontSize: 13 }}>
+              <div className="lqs-timeline-head-range" style={{ color: '#6b7280', fontSize: 13 }}>
                 当前阶段范围 {stage.ageStart}-{stage.ageEnd} 岁
               </div>
             </div>
@@ -339,6 +342,7 @@ export default function SimPage() {
               aria-label="年龄滑块"
             />
             <div
+              className="lqs-timeline-bar"
               style={{
                 position: 'relative',
                 height: 28,
@@ -354,6 +358,7 @@ export default function SimPage() {
                 return (
                   <div
                     key={s.id}
+                    className="lqs-stage-label"
                     style={{
                       position: 'absolute',
                       left: `${leftPct}%`,
@@ -369,6 +374,8 @@ export default function SimPage() {
                       color: '#111827',
                       borderRight:
                         i < STAGES.length - 1 ? '1px solid rgba(255,255,255,0.6)' : 'none',
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap',
                     }}
                     title={`${s.name} ${s.ageStart}-${s.ageEnd}`}
                   >
@@ -408,6 +415,7 @@ export default function SimPage() {
 
           {/* 四象限：成长 / 教育 / 职业 / 心理变化 */}
           <div
+            className="lqs-cards"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -422,6 +430,7 @@ export default function SimPage() {
             ].map((card) => (
               <div
                 key={card.title}
+                className="lqs-card"
                 style={{
                   padding: 14,
                   border: '1px solid #e5e7eb',
@@ -429,16 +438,17 @@ export default function SimPage() {
                   background: 'white',
                 }}
               >
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
+                <div className="lqs-card-title" style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
                   {card.title}
                 </div>
-                <div style={{ lineHeight: 1.7 }}>{card.value}</div>
+                <div className="lqs-card-body" style={{ lineHeight: 1.7 }}>{card.value}</div>
               </div>
             ))}
           </div>
 
           {/* 情境提示 */}
           <div
+            className="lqs-context-hint"
             style={{
               padding: 14,
               border: '1px dashed #d1d5db',

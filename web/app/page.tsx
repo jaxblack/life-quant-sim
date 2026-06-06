@@ -4,8 +4,12 @@ export default function HomePage() {
   return (
     <section style={{ display: 'grid', gap: 24 }}>
       <div>
-        <h1 style={{ fontSize: 48, marginBottom: 12 }}>量化人生模拟器</h1>
-        <p style={{ fontSize: 20, color: '#4b5563' }}>0-100岁 全程时间轴上的人生模拟</p>
+        <h1 className="lqs-home-title" style={{ fontSize: 48, marginBottom: 12 }}>
+          量化人生模拟器
+        </h1>
+        <p className="lqs-home-lede" style={{ fontSize: 20, color: '#4b5563' }}>
+          0-100岁 全程时间轴上的人生模拟
+        </p>
       </div>
       <div style={{ lineHeight: 1.8, color: '#374151' }}>
         <p>把人生拆成可观察的阶段,用模型理解教育、职业、健康与财富的长期影响。</p>
