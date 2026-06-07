@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import LongRangeCostChart from './components/LongRangeCostChart'
 
 type LifeStage = {
   id: string
@@ -1394,6 +1395,9 @@ export default function SimPage() {
           </section>
         </div>
       </div>
+
+      {/* 长期机会成本变化展示（5 / 10 / 20 / 30 年） */}
+      <LongRangeCostChart windows={visibleWindows} currentAge={age} />
     </section>
   )
 }
