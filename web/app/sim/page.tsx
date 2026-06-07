@@ -392,6 +392,30 @@ type Track = 'love' | 'career' | 'both'
 // 文案约束：
 //  - 涉及亲密关系（如初恋）仅描述长期关系经验与机会成本，不写性化未成年人内容。
 //  - 涉及未成年人训练 / 表演路径，仅描述技能 / 选材窗口与代价，不做外貌物化或群体标签。
+// 子分支领域: 教育 / 迁移 / 职业 / 资产 / 健康 / 家庭。
+// 仅作渲染色标与过滤用, 不参与状态判断逻辑。
+type SubBranchDomain = 'education' | 'migration' | 'career' | 'asset' | 'health' | 'family'
+
+// 子分支: 主分叉展开后看到的"下一层窗口提示"。
+type SubBranch = {
+  label: string
+  longTermLoss?: string
+  domain?: SubBranchDomain
+}
+
+// 分叉可是纯字符串(老行为, 不可点击展开),
+// 也可是带子分支的对象(点击展开下一层)。
+type WindowBranchObject = {
+  id: string
+  label: string
+  next?: SubBranch[]
+}
+type WindowBranch = string | WindowBranchObject
+
+function isBranchObject(b: WindowBranch): b is WindowBranchObject {
+  return typeof b === 'object' && b !== null && 'id' in b && 'label' in b
+}
+
 type OpportunityWindow = {
   id: string
   title: string
@@ -399,7 +423,7 @@ type OpportunityWindow = {
   ageEnd: number
   talents: Talent[]
   track: Track // 感情线 / 事业线 / 两者都涉及
-  branches: string[] // 候选分岔（≥3）
+  branches: WindowBranch[] // 候选分岔（≥3）；对象形式可携带 next 子分支
   longTermLoss: string // 错过窗口后的长期机会成本提示
 }
 
@@ -455,7 +479,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 30,
     talents: ['sports'],
     track: 'career',
-    branches: ['投入高强度训练打底', '维持中等运动量', '只做最低保养', '完全久坐'],
+    branches: [
+      {
+        id: 'high_intensity_base',
+        label: '投入高强度训练打底',
+        next: [
+          { domain: 'health', label: '抗阻训练 → 中老年肌肉储备', longTermLoss: '30 岁前每多一份肌肉量, 60 岁后跌倒/失能风险下降; 错过基底再想补需 2-3 倍训练量.' },
+          { domain: 'health', label: '心肺基础 → 慢病窗口推迟', longTermLoss: '最大摄氧量峰值在 25 岁前后定型, 后续每年 ~1% 下滑; 提前打底等于把慢病出现时间整体后移.' },
+          { domain: 'health', label: '运动损伤 → 终身慢性疼痛', longTermLoss: '高强度若不配合康复/睡眠, 半月板/腰椎/肩袖损伤可能转为 30 年慢性炎症, 反向拉低生活质量.' },
+          { domain: 'family', label: '运动社群 → 婚恋/朋友圈拓宽', longTermLoss: '运动社群是成年后少数还能产生"同地高频接触"的关系网, 错过期则后续社交回到"工作-家"两点一线.' },
+        ],
+      },
+      '维持中等运动量',
+      '只做最低保养',
+      '完全久坐',
+    ],
     longTermLoss:
       '错过这扇门：肌肉量与最大摄氧量的"利息复利"基底没攒下，40 岁后慢病与衰退斜率会更陡，长期医疗与生活质量成本被前置锁定。',
   },
@@ -482,7 +520,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 26,
     talents: ['academic', 'discipline'],
     track: 'career',
-    branches: ['头部公司校招 offer', '体制内 / 央国企校招岗', '出国 / 读研延迟使用', '直接放弃走社招'],
+    branches: [
+      '头部公司校招 offer',
+      '体制内 / 央国企校招岗',
+      {
+        id: 'study_master_then_use',
+        label: '出国 / 读研延迟使用',
+        next: [
+          { domain: 'education', label: '考上研究生 → 更广职业前景', longTermLoss: '硕士学历可解锁更多体制内/央国企/外企岗位的报名资格, 起点薪资中位数普遍上浮一档.' },
+          { domain: 'education', label: '出国读研 + 海外身份起步', longTermLoss: '语言/学校排名/项目地点共同决定毕业落地难度; 选错 STEM/非 STEM 直接影响 OPT/PSW 长度.' },
+          { domain: 'education', label: '边工作边在职读研', longTermLoss: '在职硕士在多数体制内系统中只与全日制硕士对等使用一次, 用作转岗/晋升的"砝码"而非"通行证".' },
+          { domain: 'career',    label: '应届身份留待二次校招', longTermLoss: '应届身份只能用一次, 二战留作研究生重新使用; 风险是大厂校招配额按年波动, 错峰可能让赛道集体收紧.' },
+        ],
+      },
+      '直接放弃走社招',
+    ],
     longTermLoss:
       '错过这扇门：应届身份只用一次，许多大厂 / 央国企 / 选调 / 定向名额仅向应届开放，社招通道在岗位密度与起薪斜率上都不等价。',
   },
@@ -504,7 +556,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 32,
     talents: ['academic', 'business', 'tech_esports'],
     track: 'career',
-    branches: ['一次定型深耕', '主动转一次行', '复合跨界（如技术 + 商业）', '自由职业起步'],
+    branches: [
+      '一次定型深耕',
+      '主动转一次行',
+      {
+        id: 'cross_disciplinary',
+        label: '复合跨界（如技术 + 商业）',
+        next: [
+          { domain: 'career',    label: '技术骨干 → 产品/解决方案岗', longTermLoss: '从 IC 转半商业岗的最佳窗口在 28-33 岁; 过窗后通常只能内部"转晋升"而非外部直跳.' },
+          { domain: 'education', label: '工科本硕 + MBA 组合', longTermLoss: '中欧/长江/Top US MBA 的有效申请年龄多集中在 25-32 岁, 错峰则只能走 EMBA, 校友网密度差一档.' },
+          { domain: 'career',    label: '加入早期创业团队做联合创始', longTermLoss: '联创身份在简历与未来融资两端都有杠杆, 但要求接受 1-3 年现金流断档与高离场风险.' },
+          { domain: 'health',    label: '维持训练量与精力管理', longTermLoss: '跨界期高压通勤+学习, 不预留运动/睡眠预算容易在 35 岁前透支基础健康.' },
+        ],
+      },
+      '自由职业起步',
+    ],
     longTermLoss:
       '错过这扇门：转行的"沉没成本 + 学习曲线 + 薪资断档"三件套随年龄指数上升，35 岁后职业选择权显著收紧。',
   },
@@ -537,7 +603,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 35,
     talents: ['social'],
     track: 'both',
-    branches: ['先成家再立业', '先立业后成家', '不婚但生育', '丁克 / 不育'],
+    branches: [
+      {
+        id: 'family_then_career',
+        label: '先成家再立业',
+        next: [
+          { domain: 'family', label: '一胎 → 二胎间隔规划', longTermLoss: '间隔过近母体恢复风险高, 间隔过远高龄产风险升高; 25-32 岁两胎是医学上较平稳的窗口.' },
+          { domain: 'family', label: '父母帮带 vs 配偶共担', longTermLoss: '隔代抚养便宜但易留下分离焦虑/隔代价值观冲突; 配偶共担则要求双方都接受职业斜率短期变缓.' },
+          { domain: 'asset',  label: '婚房 + 学区房 → 资产前置', longTermLoss: '生育前置则资产配置整体前移, 后期在事业上升期反而难以追加大额信贷, 现金流弹性下降.' },
+          { domain: 'career', label: '产假/育婴假 → 暂缓晋升', longTermLoss: '产育假在多数民企不计入晋升年限, 错过 P 序列大版本则可能被同期同事拉开 2-3 级.' },
+        ],
+      },
+      '先立业后成家',
+      '不婚但生育',
+      '丁克 / 不育',
+    ],
     longTermLoss:
       '错过这扇门：生育力随年龄客观下降，二胎窗口随之收窄；老年期家庭拓扑结构无法再重置，照护与陪伴的资源结构被锁定。',
   },
@@ -548,7 +628,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 45,
     talents: ['business'],
     track: 'career',
-    branches: ['一线高杠杆买房', '二三线低杠杆买房', '长期租房 + 投资', '买地 / 自建'],
+    branches: [
+      {
+        id: 'tier1_high_leverage',
+        label: '一线高杠杆买房',
+        next: [
+          { domain: 'asset',  label: '首套刚需 → 长期持有自住', longTermLoss: '首套利率/契税/限购名额是终身一次性优惠, 错峰再补需重新满足社保/落户年限.' },
+          { domain: 'asset',  label: '首付贷 + 经营贷叠加', longTermLoss: '高杠杆放大收益也放大违约风险; 政策一旦收紧(如房贷集中度), 资金链最先暴雷.' },
+          { domain: 'family', label: '婚前购房 + 加名规划', longTermLoss: '加名/赠与/公证三选一, 时序错了在离婚或继承时分配规则会完全不同.' },
+          { domain: 'career', label: '为还贷被绑定单一城市', longTermLoss: '高月供降低跳槽弹性, 城市/行业切换的机会成本被房贷锁死, 退路依赖次级流动性资产.' },
+        ],
+      },
+      '二三线低杠杆买房',
+      '长期租房 + 投资',
+      '买地 / 自建',
+    ],
     longTermLoss:
       '错过这扇门：银行按揭年限随年龄递减（通常贷款期 + 年龄 ≤ 70），杠杆放大期一旦错过几乎不可重做，地理与资产绑定结构被冻结。',
   },
@@ -627,7 +721,21 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 35,
     talents: ['academic', 'business', 'tech_esports'],
     track: 'career',
-    branches: ['Express Entry 独立申请', 'PNP 省提名项目', '进学 + 毕业工签转 PR', '放弃加拿大路径'],
+    branches: [
+      {
+        id: 'ee_independent',
+        label: 'Express Entry 独立申请',
+        next: [
+          { domain: 'migration', label: '移民海外 → 全球资产配置', longTermLoss: '取得 PR 后可走全球账户/海外房产/跨币种养老金, 需提前规划 CRS 与税务居民身份切换.' },
+          { domain: 'asset',     label: '加拿大置业 + RRSP/TFSA 建仓', longTermLoss: 'TFSA/RRSP 上限是按入境年累计, 越早开户终身额度越多; 错过早期年份不可补回.' },
+          { domain: 'family',    label: '配偶 + 子女随同登陆', longTermLoss: '随同登陆与单人登陆在加分项与子女学费两端差距巨大, 落地次序错了再补办需要重新走团聚类签证.' },
+          { domain: 'career',    label: '直接迁去主城找当地雇主', longTermLoss: '"加拿大本地工作经验"是后续雇主担保与晋升的硬通货, 远程为外国雇主工作不计入这条积累.' },
+        ],
+      },
+      'PNP 省提名项目',
+      '进学 + 毕业工签转 PR',
+      '放弃加拿大路径',
+    ],
     longTermLoss:
       '错过这扇门：加拿大 EE 评分模型对 30 岁以下赋高年龄分，随年龄接近 35 / 40 年龄分递减分趣近于零；资源型与技术型证书成本随之上升。',
   },
@@ -693,6 +801,21 @@ export default function SimPage() {
     FAMILY_BACKGROUNDS.map((b) => b.id)
   )
   const [trackTab, setTrackTab] = useState<'love' | 'career'>('career')
+
+  // 机会窗口分叉展开状态: key 为 `${winId}::${branchId}`。
+  // 仅受点击 handler 驱动, 不影响其他任何计算 / 现有趋势指标 / 人物动画。
+  const [expandedBranches, setExpandedBranches] = useState<Set<string>>(
+    () => new Set<string>(),
+  )
+  const toggleBranch = (winId: string, branchId: string) => {
+    setExpandedBranches((prev) => {
+      const key = `${winId}::${branchId}`
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const region = REGIONS.find((r) => r.id === regionId) ?? REGIONS[0]
   const family = FAMILIES.find((f) => f.id === familyId) ?? FAMILIES[0]
@@ -1517,22 +1640,124 @@ export default function SimPage() {
                       }}
                       aria-label="候选分岔"
                     >
-                      {win.branches.map((b) => (
-                        <span
-                          key={b}
-                          style={{
-                            fontSize: 12,
-                            padding: '3px 8px',
-                            border: `1px solid ${palette.border}`,
-                            borderRadius: 6,
-                            background: 'white',
-                            color: '#111827',
-                          }}
-                        >
-                          {b}
-                        </span>
-                      ))}
+                      {win.branches.map((b) => {
+                        // 老式字符串分支 → 仍为不可点击 chip。
+                        if (!isBranchObject(b)) {
+                          return (
+                            <span
+                              key={b}
+                              style={{
+                                fontSize: 12,
+                                padding: '3px 8px',
+                                border: `1px solid ${palette.border}`,
+                                borderRadius: 6,
+                                background: 'white',
+                                color: '#111827',
+                              }}
+                            >
+                              {b}
+                            </span>
+                          )
+                        }
+                        const expanded = expandedBranches.has(`${win.id}::${b.id}`)
+                        const hasNext = !!b.next && b.next.length > 0
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => hasNext && toggleBranch(win.id, b.id)}
+                            aria-expanded={hasNext ? expanded : undefined}
+                            aria-controls={hasNext ? `subbr-${win.id}-${b.id}` : undefined}
+                            disabled={!hasNext}
+                            style={{
+                              fontSize: 12,
+                              padding: '3px 8px',
+                              border: `1px solid ${palette.border}`,
+                              borderRadius: 6,
+                              background: expanded ? palette.bg : 'white',
+                              color: '#111827',
+                              cursor: hasNext ? 'pointer' : 'default',
+                              fontFamily: 'inherit',
+                              fontWeight: hasNext ? 600 : 400,
+                            }}
+                          >
+                            {hasNext ? (expanded ? '▾ ' : '▸ ') : ''}{b.label}
+                          </button>
+                        )
+                      })}
                     </div>
+                    {/* 子分支展开区: 在父分叉 chip 行下方, 仅在点击展开后渲染。 */}
+                    {win.branches.some(
+                      (b) => isBranchObject(b) && expandedBranches.has(`${win.id}::${b.id}`),
+                    ) && (
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {win.branches.map((b) =>
+                          isBranchObject(b) &&
+                          expandedBranches.has(`${win.id}::${b.id}`) &&
+                          b.next &&
+                          b.next.length > 0 ? (
+                            <div
+                              key={`expand-${b.id}`}
+                              id={`subbr-${win.id}-${b.id}`}
+                              role="region"
+                              aria-label={`子分支: ${b.label}`}
+                              style={{
+                                border: `1px dashed ${palette.border}`,
+                                background: 'white',
+                                borderRadius: 8,
+                                padding: '8px 10px',
+                                display: 'grid',
+                                gap: 6,
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: palette.tag, fontWeight: 600 }}>
+                                下一层分支 · {b.label}
+                              </div>
+                              <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
+                                {b.next.map((sub, idx) => {
+                                  const domainTag = sub.domain
+                                    ? ({
+                                        education: { name: '教育', color: '#1d4ed8' },
+                                        migration: { name: '迁移', color: '#0d9488' },
+                                        career: { name: '职业', color: '#b45309' },
+                                        asset: { name: '资产', color: '#9333ea' },
+                                        health: { name: '健康', color: '#16a34a' },
+                                        family: { name: '家庭', color: '#db2777' },
+                                      } as const)[sub.domain]
+                                    : null
+                                  return (
+                                    <li key={idx} style={{ fontSize: 12, lineHeight: 1.6 }}>
+                                      {domainTag && (
+                                        <span
+                                          style={{
+                                            display: 'inline-block',
+                                            fontSize: 10,
+                                            color: 'white',
+                                            background: domainTag.color,
+                                            padding: '1px 6px',
+                                            borderRadius: 999,
+                                            marginRight: 6,
+                                            verticalAlign: 'middle',
+                                          }}
+                                        >
+                                          {domainTag.name}
+                                        </span>
+                                      )}
+                                      <strong>{sub.label}</strong>
+                                      {sub.longTermLoss && (
+                                        <span style={{ color: '#374151' }}>
+                                          {' — '}{sub.longTermLoss}
+                                        </span>
+                                      )}
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            </div>
+                          ) : null,
+                        )}
+                      </div>
+                    )}
                     {(status === 'closing' || status === 'missed') && (
                       <div
                         style={{
