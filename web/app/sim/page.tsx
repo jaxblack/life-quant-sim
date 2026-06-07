@@ -504,6 +504,62 @@ function classifyWindow(age: number, win: OpportunityWindow): OpportunityStatus 
   return 'current'
 }
 
+// —— 用户手动输入：当前人生状态 ——
+// 这些字段由用户自定义，独立于"派生状态卡"，允许用户覆写真实情况。
+// 用 React useState 持有，不持久化（刷新即失效）；后续接入引擎时再考虑序列化到 URL / localStorage。
+const WEALTH_TIERS = ['极高净值', '高净值', '中产偏上', '中产', '小康', '工薪', '紧巴', '负债'] as const
+const EDUCATION_LEVELS = [
+  '学前',
+  '小学',
+  '初中',
+  '高中 / 中专',
+  '大专',
+  '本科在读',
+  '本科',
+  '硕士在读',
+  '硕士',
+  '博士在读',
+  '博士',
+  '其他',
+] as const
+const HEALTH_LEVELS = ['优秀', '良好', '一般', '较差', '需要照护'] as const
+
+type WealthTier = (typeof WEALTH_TIERS)[number]
+type EducationLevel = (typeof EDUCATION_LEVELS)[number]
+type HealthLevel = (typeof HEALTH_LEVELS)[number]
+
+type UserState = {
+  wealth: WealthTier
+  identity: string
+  education: EducationLevel
+  health: HealthLevel
+}
+
+// —— 人生分叉路：用户可添加 / 编辑的"决策分支" ——
+// 每条 LifeFork 至少含名称与一条关键选择文本；默认预填 2 条供用户参考与编辑。
+type LifeFork = {
+  id: string
+  name: string
+  choice: string
+}
+
+function makeForkId(): string {
+  return `fork-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+const DEFAULT_FORKS: LifeFork[] = [
+  {
+    id: makeForkId(),
+    name: '继续大厂深耕',
+    choice: '留在当前公司争取 35 岁前晋升 M2',
+  },
+  {
+    id: makeForkId(),
+    name: '出海创业',
+    choice: '辞职去新加坡参与早期 AI 初创团队',
+  },
+]
+
 export default function SimPage() {
   const [age, setAge] = useState<number>(18)
   const [regionId, setRegionId] = useState<string>(REGIONS[1].id)
@@ -517,6 +573,20 @@ export default function SimPage() {
     FAMILY_BACKGROUNDS.map((b) => b.id)
   )
   const [trackTab, setTrackTab] = useState<'love' | 'career'>('career')
+
+  // —— 用户自定义"当前人生状态"（资产 / 身份 / 学历 / 健康）——
+  // 与下方派生状态卡 (statusCards) 解耦：派生卡只是基于 age/region/family 的参考估计，
+  // 这里允许用户用真实数据覆写自己的当前画像，作为后续引擎输入。
+  const [userState, setUserState] = useState<UserState>({
+    wealth: '中产',
+    identity: '在职青年',
+    education: '本科',
+    health: '良好',
+  })
+
+  // —— 人生分叉路（至少两条）——
+  // 用户可添加 / 编辑 / 删除；删除后若总数 < 2，删除按钮会被禁用以保证至少两条可见。
+  const [lifeForks, setLifeForks] = useState<LifeFork[]>(DEFAULT_FORKS)
 
   const region = REGIONS.find((r) => r.id === regionId) ?? REGIONS[0]
   const family = FAMILIES.find((f) => f.id === familyId) ?? FAMILIES[0]
@@ -861,6 +931,153 @@ export default function SimPage() {
 
         {/* 主区 */}
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
+          {/* 用户手动输入：当前人生状态（资产 / 身份 / 学历 / 健康） */}
+          {/* 与下方派生状态卡解耦：派生卡是基于 age/region/family 的参考估计，这里允许用户用真实数据覆写。 */}
+          <section
+            aria-labelledby="user-state-heading"
+            className="lqs-user-state"
+            style={{
+              padding: 14,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: 'white',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'grid', gap: 4 }}>
+              <h2
+                id="user-state-heading"
+                style={{ fontSize: 16, margin: 0 }}
+              >
+                当前人生状态设置
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  color: '#6b7280',
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}
+              >
+                填写真实的当前状态：年龄 / 阶段（由滑块决定）、资产、身份、学历、健康。
+                这些字段是后续接入引擎时的输入，不会影响左侧"出生地域 / 出身家庭"这类先天背景的派生计算。
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                gap: 10,
+              }}
+            >
+              {/* 年龄 / 阶段（只读展示，由下方滑块控制） */}
+              <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                <span>年龄 / 阶段</span>
+                <div
+                  aria-label="当前年龄与阶段（由下方滑块控制）"
+                  style={{
+                    padding: '8px 10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    background: '#f9fafb',
+                    color: '#111827',
+                    fontSize: 13,
+                  }}
+                >
+                  {age} 岁 · {stage.name}
+                </div>
+              </label>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                <span>资产</span>
+                <select
+                  value={userState.wealth}
+                  onChange={(e) =>
+                    setUserState((s) => ({ ...s, wealth: e.target.value as WealthTier }))
+                  }
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    fontSize: 13,
+                  }}
+                  aria-label="资产档位"
+                >
+                  {WEALTH_TIERS.map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                <span>身份 / 职业</span>
+                <input
+                  type="text"
+                  value={userState.identity}
+                  onChange={(e) =>
+                    setUserState((s) => ({ ...s, identity: e.target.value }))
+                  }
+                  placeholder="例：高级工程师 / 在校生 / 公务员"
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    fontSize: 13,
+                  }}
+                  aria-label="身份"
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                <span>学历</span>
+                <select
+                  value={userState.education}
+                  onChange={(e) =>
+                    setUserState((s) => ({ ...s, education: e.target.value as EducationLevel }))
+                  }
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    fontSize: 13,
+                  }}
+                  aria-label="学历"
+                >
+                  {EDUCATION_LEVELS.map((edu) => (
+                    <option key={edu} value={edu}>{edu}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                <span>健康</span>
+                <select
+                  value={userState.health}
+                  onChange={(e) =>
+                    setUserState((s) => ({ ...s, health: e.target.value as HealthLevel }))
+                  }
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    fontSize: 13,
+                  }}
+                  aria-label="健康"
+                >
+                  {HEALTH_LEVELS.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
           {/* 当前状态卡：资产 / 身份 / 学历 / 身体机能，红/绿涨跌可视化 */}
           <div
             className="lqs-status-cards"
@@ -1391,6 +1608,189 @@ export default function SimPage() {
                 )
               })}
             </ul>
+          </section>
+
+          {/* 人生分叉路设置：用户可添加 / 编辑 / 删除分支；至少保留 2 条。 */}
+          <section
+            aria-labelledby="life-forks-heading"
+            className="lqs-life-forks"
+            style={{
+              padding: 14,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: 'white',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'grid', gap: 4 }}>
+              <h2
+                id="life-forks-heading"
+                style={{ fontSize: 16, margin: 0 }}
+              >
+                人生分叉路设置
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  color: '#6b7280',
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}
+              >
+                设置至少两条可对比的分岔路；每条需要一个名称与一句关键选择。
+                后续接入引擎后，这些分支会作为对照组进入 LifeOutcome 差值评估。
+              </p>
+            </div>
+
+            <ul
+              style={{
+                listStyle: 'none',
+                padding: 0,
+                margin: 0,
+                display: 'grid',
+                gap: 10,
+              }}
+            >
+              {lifeForks.map((fork, idx) => {
+                const canDelete = lifeForks.length > 2
+                return (
+                  <li
+                    key={fork.id}
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 10,
+                      padding: 10,
+                      background: '#fafafa',
+                      display: 'grid',
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: '#6b7280' }}>
+                        分叉 #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setLifeForks((prev) => prev.filter((f) => f.id !== fork.id))
+                        }
+                        disabled={!canDelete}
+                        title={canDelete ? '删除该分叉' : '至少保留两条分叉路'}
+                        aria-label={`删除分叉 ${idx + 1}`}
+                        style={{
+                          fontSize: 12,
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          background: canDelete ? 'white' : '#f3f4f6',
+                          color: canDelete ? '#b91c1c' : '#9ca3af',
+                          cursor: canDelete ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                      <span>分叉名称</span>
+                      <input
+                        type="text"
+                        value={fork.name}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setLifeForks((prev) =>
+                            prev.map((f) =>
+                              f.id === fork.id ? { ...f, name: next } : f
+                            )
+                          )
+                        }}
+                        placeholder="例：留京读研 / 出海创业 / 回老家考公"
+                        style={{
+                          padding: 8,
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          background: 'white',
+                          fontSize: 13,
+                        }}
+                        aria-label={`分叉 ${idx + 1} 名称`}
+                      />
+                    </label>
+                    <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
+                      <span>关键选择</span>
+                      <textarea
+                        value={fork.choice}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setLifeForks((prev) =>
+                            prev.map((f) =>
+                              f.id === fork.id ? { ...f, choice: next } : f
+                            )
+                          )
+                        }}
+                        placeholder="一句话写清这条分岔最核心的决策动作"
+                        rows={2}
+                        style={{
+                          padding: 8,
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          background: 'white',
+                          fontSize: 13,
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                        aria-label={`分叉 ${idx + 1} 关键选择`}
+                      />
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <button
+                type="button"
+                onClick={() =>
+                  setLifeForks((prev) => [
+                    ...prev,
+                    { id: makeForkId(), name: '', choice: '' },
+                  ])
+                }
+                style={{
+                  fontSize: 13,
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: '1px dashed #6b7280',
+                  background: 'white',
+                  color: '#111827',
+                  cursor: 'pointer',
+                }}
+              >
+                + 添加分叉路
+              </button>
+            </div>
+
+            {lifeForks.length < 2 && (
+              <div
+                role="alert"
+                style={{
+                  fontSize: 12,
+                  color: '#b91c1c',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 6,
+                  padding: 8,
+                }}
+              >
+                建议至少保留 2 条分叉路用于对照分析。
+              </div>
+            )}
           </section>
         </div>
       </div>
