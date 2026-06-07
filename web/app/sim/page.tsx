@@ -11,10 +11,14 @@ type LifeStage = {
   education: string
   career: string
   psychology: string
+  // 关键人生事件：该阶段最具代表性的几类"必须做出选择"的人生节点。
+  // 用于在阶段卡片中提示用户：哪些事件天然挤在这个年龄段、错过 / 提前都意味着重大路径切换。
+  keyEvents: string[]
 }
 
-// 与 engine/_STAGES 对齐：6 个阶段覆盖 0-100 岁全程。
-// 若后续 src/data/lifeStages.zh.json 落地，可替换为 JSON 加载。
+// 7 个阶段覆盖 0-100 岁全程：童年 / 少年 / 青年(20-29) / 成年(30-39) / 中年(40-59) / 晚年早期 / 高龄。
+// 之前的版本将 20-39 整段都叫"青年"，跨度 20 年内涵差异极大；
+// 30 岁前后的人生议题（首次买房 / 生育决策 / 35 岁焦虑）实际属于"成年"段，已独立成阶段。
 const STAGES: LifeStage[] = [
   {
     id: 'childhood',
@@ -25,6 +29,12 @@ const STAGES: LifeStage[] = [
     education: '学前 → 小学：识字、规则感、同伴关系起步。',
     career: '尚无职业概念，兴趣与好奇心是早期"职业种子"。',
     psychology: '安全感、信任感的关键期；自尊雏形开始建立。',
+    keyEvents: [
+      '出生 / 上户 / 疫苗接种节奏',
+      '入园 / 入学：第一次系统性社会化',
+      '艺术 / 体育童子功是否启动（钢琴、绘画、体校）',
+      '隔代抚养或留守：依恋对象是否稳定',
+    ],
   },
   {
     id: 'adolescence',
@@ -35,16 +45,44 @@ const STAGES: LifeStage[] = [
     education: '初中 → 高中 → 高考：抽象思维与考试压力同步上升。',
     career: '兴趣分化、职业幻想期；首次面临生涯方向选择。',
     psychology: '身份探索 vs 角色混乱；情绪波动大，自我同一性形成。',
+    keyEvents: [
+      '中考 / 高考分流：升学路径、文理分科或职高',
+      '第一段同伴关系 / 初恋（仅长期关系经验，不评估外貌）',
+      '是否离家求学（住校 / 异地 / 留学）',
+      '兴趣是否升级为专业方向（艺考、体校、竞赛保送）',
+    ],
   },
   {
     id: 'early_adult',
     name: '青年',
     ageStart: 20,
-    ageEnd: 39,
+    ageEnd: 29,
     growth: '体能与认知巅峰；建立独立的生活方式。',
     education: '大学 → 研究生 / 入职培训；学习方式从被动转为自驱。',
-    career: '职业起步、跳槽、首次晋升；积累人脉与专业资本。',
-    psychology: '亲密关系、组建家庭；自我效能感与意义感成为核心议题。',
+    career: '应届身份用一次：校招、考公、考研或出国，决定行业入口。',
+    psychology: '亲密关系、自我效能与意义感同时上线，从"被照顾者"转为"自我负责者"。',
+    keyEvents: [
+      '本科 / 硕士毕业：应届身份与首份工作的城市选择',
+      '考公 / 考编 / 考研 / 出国 / 创业：首次职业方向锁定',
+      '初次同居或长期亲密关系开始',
+      '是否在出生城市之外建立生活基地（户口 / 租房 / 买首套）',
+    ],
+  },
+  {
+    id: 'adult_30s',
+    name: '成年',
+    ageStart: 30,
+    ageEnd: 39,
+    growth: '体能从峰值缓步回落，恢复速度下降，生活习惯开始决定中年斜率。',
+    education: '在岗深造、跳槽、读博 / MBA；学习目标从"积累"转向"转型"。',
+    career: '专业资本与人脉成型期；首次晋升与"35 岁焦虑"在此阶段叠加出现。',
+    psychology: '亲密关系定型、生育决策、与原生家庭重新校准；身份从"年轻人"过渡到"中坚"。',
+    keyEvents: [
+      '婚姻 / 长期伴侣关系登记或解除',
+      '生育决策（一胎 / 二胎 / 不育）与生育力窗口',
+      '首次中层晋升或主动跳槽，部分人面临 35 岁裁员风险',
+      '首套或改善型住房决策；父母进入慢病期，赡养议题首次落地',
+    ],
   },
   {
     id: 'mid_adult',
@@ -55,6 +93,12 @@ const STAGES: LifeStage[] = [
     education: '终身学习、行业再学习、为孩子的教育做规划。',
     career: '职业平台期或巅峰；管理岗位、再创业或转型抉择。',
     psychology: '中年危机、意义重审；上有老下有小的多线压力。',
+    keyEvents: [
+      '40+ 中层瓶颈：晋升、转型或被裁的三岔路',
+      '父母重大医疗事件（住院 / 手术 / 失能）首次出现',
+      '子女中考 / 高考 / 升学路径与教育资源迁移',
+      '婚姻中段调整：分居、离婚或主动维护亲密关系',
+    ],
   },
   {
     id: 'late_adult',
@@ -65,6 +109,12 @@ const STAGES: LifeStage[] = [
     education: '老年大学、兴趣班；以自我滋养为目的的学习。',
     career: '退休 / 返聘 / 个人兴趣事业；从职位身份转向"做自己"。',
     psychology: '生命回顾、传承感；与孙辈关系是重要情感来源。',
+    keyEvents: [
+      '正式退休 / 提前退休 / 返聘：身份过渡与社保金启用',
+      '抱孙辈 / 隔代抚育是否承担',
+      '配偶或同辈挚友首次离世带来的累积性丧失',
+      '资产从增值期转入保值期，开始系统规划遗产与传承',
+    ],
   },
   {
     id: 'old_age',
@@ -75,6 +125,12 @@ const STAGES: LifeStage[] = [
     education: '从学习者转为"故事讲述者"；经验沉淀成家庭叙事。',
     career: '基本退出生产性劳动，更多扮演家族精神支柱。',
     psychology: '人生整合 vs 绝望；与时间和解，面向终点的从容。',
+    keyEvents: [
+      '失能 / 失智照护是否启动（家庭照护 vs 机构）',
+      '丧偶后独居或与子女合住的居住安排',
+      '医疗预嘱 / 临终意愿的表达与执行',
+      '家族叙事的口述传承（家庭故事讲述者角色）',
+    ],
   },
 ]
 
@@ -131,15 +187,23 @@ const TALENTS: { id: Talent; name: string }[] = [
   { id: 'business', name: '商业' },
 ]
 
-// 家庭背景过滤：在已有 FAMILIES 之上做的二级粗分类。
-// 仅用于过滤左侧"出身家庭"下拉里出现的选项，不替换原有 FAMILIES 数据。
-type FamilyBackground = 'rural' | 'county' | 'urban_middle' | 'wealthy'
+// 教养氛围过滤：与“出身家庭”正交的二级类别。
+// 之前以“农村 / 县城 / 城市中产 / 富裕家庭”作为过滤项，与“出身家庭”语义大量重合（富裕家庭两边都出）。
+// 现重新定义为"教养氛围"：描述父母与子女的互动风格（权威 / 民主 / 放任 / 疏离 / 隔代），
+// 与家庭经济资源状况独立。从而与“出身家庭”不再语义重叠。
+type FamilyBackground = 'authoritative' | 'democratic' | 'permissive' | 'distant' | 'multigen'
 
 const FAMILY_BACKGROUNDS: { id: FamilyBackground; name: string; brief: string; familyIds: string[] }[] = [
-  { id: 'rural', name: '农村', brief: '土地紧密、教育与医疗资源稀缺。', familyIds: ['poor', 'leftbehind'] },
-  { id: 'county', name: '县城', brief: '熟人社会，圈层流动通常需要离开。', familyIds: ['working', 'single'] },
-  { id: 'urban_middle', name: '城市中产', brief: '双职工小康，对下行风险敏感。', familyIds: ['middle'] },
-  { id: 'wealthy', name: '富裕家庭', brief: '资本充足，决策自由度高。', familyIds: ['wealthy'] },
+  // 民主型家庭多出现于中产、部分富裕家庭；氟围开明、鼓励发表、重视边界。
+  { id: 'democratic', name: '民主开明', brief: '鼓励表达与边界意识，子女发言权高；多出现在中产与部分富裕家庭。', familyIds: ['middle', 'wealthy'] },
+  // 权威型：家长说了算、学业驱动；在工薪、中产、部分贫困中都可能出现。
+  { id: 'authoritative', name: '权威驱动', brief: '学业 / 规则优先，家长拍板、股励低；常见于工薪、中产、部分贫困家庭。', familyIds: ['working', 'middle', 'poor'] },
+  // 放任 / 温室型：以情感补偿代替边界设定；在富裕、单亲中都可能出现。
+  { id: 'permissive', name: '宽松补偿', brief: '以情感与资源补偿代替边界；常见于富裕家庭、单亲家庭。', familyIds: ['wealthy', 'single'] },
+  // 疏离 / 冷漠型：情感表达较少、互动频率低。
+  { id: 'distant', name: '疏离冷漠', brief: '情感表达与互动频率较低，家庭话题以讲事实为主；跨不同经济阶层出现。', familyIds: ['working', 'middle', 'poor', 'single'] },
+  // 隔代 / 分住型：祖辈为主要报顾者，父母远在。
+  { id: 'multigen', name: '隔代分住', brief: '以祖辈为主要照顾者，父母远在或仅负责汇款；多为留守 / 务工家庭。', familyIds: ['leftbehind', 'poor'] },
 ]
 
 // 人生窗口的领域线：用于"感情线 / 事业线"切换
@@ -717,10 +781,10 @@ export default function SimPage() {
           </div>
 
           <div className="lqs-aside-section">
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>家庭背景</div>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>教养氛围</div>
             <div
               role="group"
-              aria-label="家庭背景过滤"
+              aria-label="教养氛围过滤"
               style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
             >
               {FAMILY_BACKGROUNDS.map((b) => {
@@ -757,7 +821,7 @@ export default function SimPage() {
                 lineHeight: 1.6,
               }}
             >
-              勾选“农村 / 县城 / 城市中产 / 富裕家庭”限定下方“出身家庭”下拉可选项。
+              勾选教养氛围会限定下方"出身家庭"下拉中最常与之共现的家庭类型；不是严格一对一。
             </p>
           </div>
 
@@ -986,6 +1050,48 @@ export default function SimPage() {
                 <div className="lqs-card-body" style={{ lineHeight: 1.7 }}>{card.value}</div>
               </div>
             ))}
+          </div>
+
+          {/* 关键人生事件：该阶段天然挤在这个年龄段的选择节点。 */}
+          <div
+            className="lqs-key-events"
+            style={{
+              padding: 14,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: 'white',
+            }}
+          >
+            <div
+              className="lqs-card-title"
+              style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}
+            >
+              关键人生事件
+            </div>
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: 18,
+                lineHeight: 1.8,
+                color: '#111827',
+                fontSize: 14,
+              }}
+            >
+              {stage.keyEvents.map((ev) => (
+                <li key={ev}>{ev}</li>
+              ))}
+            </ul>
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 0,
+                color: '#6b7280',
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              这些事件在{stage.name}阶段会高频出现；错过或提前都可能触发重大路径切换。
+            </p>
           </div>
 
           {/* 情境提示 */}
