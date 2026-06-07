@@ -194,7 +194,29 @@ function CharacterFigure({ a }: { a: CharacterAppearance }) {
         {/* 眼睛 */}
         <circle cx={-headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
         <circle cx={headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
-        {/* 躯干 */}
+        {/* 眼皮 (默认压平, 偶发快闪为眺眼动作) */}
+        <rect
+          className="lqs-eyelid-l"
+          x={-headR * 0.35 - 0.9}
+          y={headR * 0.95 - 1.0}
+          width={1.8}
+          height={1.1}
+          fill="#fde68a"
+          stroke="#b45309"
+          strokeWidth={0.25}
+        />
+        <rect
+          className="lqs-eyelid-r"
+          x={headR * 0.35 - 0.9}
+          y={headR * 0.95 - 1.0}
+          width={1.8}
+          height={1.1}
+          fill="#fde68a"
+          stroke="#b45309"
+          strokeWidth={0.25}
+        />
+        {/* 躯干 (自带 .lqs-torso-breath 实现 idle 呼吸) */}
+        <g className="lqs-torso-breath">
         <rect
           x={-headR * 0.85}
           y={headR * 2}
@@ -205,6 +227,7 @@ function CharacterFigure({ a }: { a: CharacterAppearance }) {
           stroke={a.outfitStroke}
           strokeWidth={0.6}
         />
+        </g>
         {/* 领带 */}
         {a.accessory === 'tie' && (
           <path
@@ -295,13 +318,15 @@ function CharacterStage({ stageId, age, stageName, regionName, familyName }: { s
   const a = appearanceForStageId(stageId)
   return (
     <div
-      className="lqs-character-stage"
+      className="lqs-character-stage lqs-stage-transition"
       role="img"
       aria-label={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人走动动画: ${a.caption}`}
+      key={stageId}
     >
       <div className="lqs-character-caption">{age} 岁 · {stageName} · {a.caption}</div>
       <div className="lqs-character-ground" />
       <div className="lqs-character-walker">
+        <div className="lqs-character-shadow" />
         <div className="lqs-character-bob">
           <div className="lqs-character" style={{ width: '100%' }}>
             <CharacterFigure a={a} />
@@ -1158,8 +1183,9 @@ export default function SimPage() {
           </div>
         </aside>
 
-        {/* 主区 */}
-        <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
+        {/* 主区 (alt-a: PC 1100px+ 切两列 — 左侧时间轴+状态, 右侧机会窗口直接进入首屏) */}
+        <div className="lqs-sim-content">
+          <div className="lqs-sim-col-left">
           {/* 当前状态卡：资产 / 身份 / 学历 / 身体机能，红/绿涨跌可视化 */}
           <div
             className="lqs-status-cards"
@@ -1419,6 +1445,9 @@ export default function SimPage() {
             本页面展示阶段结构与轻量 SVG 小人成长 / 走路动画，尚未接入随机抽样引擎。
           </div>
 
+          </div>
+          {/* alt-a: PC 右列 */}
+          <div className="lqs-sim-col-right">
           {/* 当前阶段即将错过的人生窗口 · 机会成本 */}
           <section
             aria-labelledby="opportunity-cost-heading"
@@ -1801,6 +1830,7 @@ export default function SimPage() {
               })}
             </ul>
           </section>
+          </div>
         </div>
       </div>
     </section>
