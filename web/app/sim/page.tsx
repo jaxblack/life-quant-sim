@@ -1,6 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import {
+  DEFAULT_BRANCHES,
+  buildInitialConditions,
+  simulate,
+  type BranchDecision,
+  type LifeOutcome,
+} from '../../lib/lifeSim'
 
 type LifeStage = {
   id: string
@@ -517,6 +524,17 @@ export default function SimPage() {
     FAMILY_BACKGROUNDS.map((b) => b.id)
   )
   const [trackTab, setTrackTab] = useState<'love' | 'career'>('career')
+
+  // 机会成本模拟：选择 ≥2 条分叉路径，串联当前状态 → 长期 LifeOutcome。
+  // 默认勾选前两条以确保区块一打开就能看到\"长期对比\"。
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(
+    DEFAULT_BRANCHES.slice(0, 2).map((b) => b.id)
+  )
+  const toggleBranch = (id: string) => {
+    setSelectedBranchIds((prev: string[]) =>
+      prev.includes(id) ? prev.filter((x: string) => x !== id) : [...prev, id]
+    )
+  }
 
   const region = REGIONS.find((r) => r.id === regionId) ?? REGIONS[0]
   const family = FAMILIES.find((f) => f.id === familyId) ?? FAMILIES[0]
@@ -1392,8 +1410,274 @@ export default function SimPage() {
               })}
             </ul>
           </section>
+
+          {/* 机会成本模拟：当前状态 + 分叉路径 → 长期对比结果 */}
+          <section
+            id="opp-cost-sim"
+            aria-labelledby="opp-cost-sim-heading"
+            style={{
+              display: 'grid',
+              gap: 12,
+              padding: 16,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: 'white',
+            }}
+          >
+            <div style={{ display: 'grid', gap: 4 }}>
+              <h2
+                id="opp-cost-sim-heading"
+                style={{ fontSize: 18, margin: 0 }}
+              >
+                机会成本模拟 · 当前状态 → 分叉路径 → 长期对比
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  color: '#6b7280',
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                }}
+              >
+                将当前 (出生地域 / 出身家庭 / 年龄) 作为 InitialConditions
+                输入，挑选 ≥2 条<strong>分叉路径</strong>，分别跑完 0-100
+                岁的最小本地引擎，得到长期 <code>LifeOutcome</code>
+                五维向量并做横向对比。
+                后续接入完整 Python 引擎后，本区块的输入 / 输出形状保持不变，UI 不需要改写。
+              </p>
+            </div>
+
+            <div
+              role="group"
+              aria-label="选择候选分叉路径"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              {DEFAULT_BRANCHES.map((b: BranchDecision) => {
+                const active = selectedBranchIds.includes(b.id)
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => toggleBranch(b.id)}
+                    aria-pressed={active}
+                    title={b.description}
+                    style={{
+                      fontSize: 13,
+                      padding: '8px 12px',
+                      border: `1px solid ${active ? '#111827' : '#d1d5db'}`,
+                      borderRadius: 10,
+                      background: active ? '#111827' : 'white',
+                      color: active ? 'white' : '#111827',
+                      cursor: 'pointer',
+                      maxWidth: 280,
+                      textAlign: 'left',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                      {b.name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: active ? '#d1d5db' : '#6b7280',
+                      }}
+                    >
+                      {b.description}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedBranchIds.length < 2 && (
+              <div
+                style={{
+                  fontSize: 12,
+                  padding: '8px 12px',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  borderRadius: 8,
+                  border: '1px dashed #fbbf24',
+                }}
+              >
+                请至少选择 2 条分叉以查看长期对比结果。
+              </div>
+            )}
+
+            <SimulationCompare
+              regionId={regionId}
+              familyId={familyId}
+              age={age}
+              selectedBranchIds={selectedBranchIds}
+            />
+          </section>
         </div>
       </div>
     </section>
+  )
+}
+
+// 子组件：把 DEFAULT_BRANCHES 中被选中的几条分别跑一遍 simulate()，
+// 把 LifeOutcome 拆成五行长期指标做并排展示。
+//
+// 拆成独立组件主要为了：
+//  1. 把模拟计算 useMemo 限定在自己 props 变化时重新跑；
+//  2. 让上层 SimPage 的 JSX 不再继续膨胀；
+//  3. 后续若要把模拟切换到 Web Worker / 真 engine，只需换掉本组件实现。
+function SimulationCompare(props: {
+  regionId: string
+  familyId: string
+  age: number
+  selectedBranchIds: string[]
+}) {
+  const { regionId, familyId, age, selectedBranchIds } = props
+
+  const results = useMemo(() => {
+    const ic = buildInitialConditions({ regionId, familyId, age })
+    const branches = DEFAULT_BRANCHES.filter((b: BranchDecision) =>
+      selectedBranchIds.includes(b.id)
+    )
+    return branches.map((b: BranchDecision) => ({
+      branch: b,
+      outcome: simulate(ic, b),
+    }))
+  }, [regionId, familyId, age, selectedBranchIds])
+
+  if (results.length < 2) return null
+
+  // 五维 LifeOutcome → 中文指标行配置。
+  const metrics: {
+    key: keyof LifeOutcome
+    label: string
+    unit: string
+    digits: number
+  }[] = [
+    { key: 'total_money_value', label: '终生货币价值', unit: 'k 单位', digits: 1 },
+    { key: 'total_social_value', label: '社会资本累计', unit: 'k 单位', digits: 1 },
+    { key: 'self_meaning', label: '自我意义感', unit: '', digits: 1 },
+    { key: 'healthy_lifespan', label: '健康寿命（年）', unit: '年', digits: 0 },
+    { key: 'network_density', label: '人脉密度', unit: '0..1', digits: 2 },
+  ]
+
+  return (
+    <div
+      role="region"
+      aria-label="长期对比结果"
+      style={{
+        overflowX: 'auto',
+        borderRadius: 10,
+        border: '1px solid #e5e7eb',
+      }}
+    >
+      <table
+        style={{
+          borderCollapse: 'collapse',
+          width: '100%',
+          fontSize: 13,
+          background: 'white',
+        }}
+      >
+        <thead>
+          <tr style={{ background: '#f9fafb' }}>
+            <th
+              style={{
+                textAlign: 'left',
+                padding: '10px 12px',
+                borderBottom: '1px solid #e5e7eb',
+                color: '#374151',
+              }}
+            >
+              指标
+            </th>
+            {results.map((r) => (
+              <th
+                key={r.branch.id}
+                style={{
+                  textAlign: 'right',
+                  padding: '10px 12px',
+                  borderBottom: '1px solid #e5e7eb',
+                  color: '#111827',
+                  fontWeight: 600,
+                }}
+              >
+                {r.branch.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {metrics.map((m) => {
+            const values = results.map((r) =>
+              Number(r.outcome[m.key])
+            )
+            const max = Math.max(...values)
+            const min = Math.min(...values)
+            return (
+              <tr key={m.key as string}>
+                <td
+                  style={{
+                    padding: '10px 12px',
+                    borderBottom: '1px solid #f3f4f6',
+                    color: '#374151',
+                  }}
+                >
+                  {m.label}
+                  {m.unit ? (
+                    <span style={{ color: '#9ca3af', marginLeft: 6 }}>
+                      ({m.unit})
+                    </span>
+                  ) : null}
+                </td>
+                {results.map((r, i) => {
+                  const v = values[i]
+                  const isMax = max !== min && v === max
+                  const isMin = max !== min && v === min
+                  return (
+                    <td
+                      key={r.branch.id}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid #f3f4f6',
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        color: isMax ? '#047857' : isMin ? '#b91c1c' : '#111827',
+                        fontWeight: isMax ? 600 : 400,
+                        background: isMax
+                          ? '#ecfdf5'
+                          : isMin
+                          ? '#fef2f2'
+                          : 'transparent',
+                      }}
+                    >
+                      {v.toFixed(m.digits)}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div
+        style={{
+          padding: '8px 12px',
+          fontSize: 11,
+          color: '#6b7280',
+          background: '#fafafa',
+          borderTop: '1px solid #e5e7eb',
+          lineHeight: 1.6,
+        }}
+      >
+        说明：本地最小引擎按年化乘子做长期累积，结果用于横向对比；
+        绿色 = 该指标该路径胜出，红色 = 该指标该路径垫底。
+        正式接入 <code>engine.life_sim</code> 后，<code>simulate()</code>
+        只是替换实现，本表展示形态不变。
+      </div>
+    </div>
   )
 }
