@@ -1,0 +1,123 @@
+{
+  "$schema": "opportunityForks.zh.v1",
+  "note": "示例分叉数据(应届生 24 岁起):forks[0] 视为机会成本基线; 每条 fork 的 segments 描述每年对四个指标(资产/身份/学历/健康)的相对增量(单位:指数点 / 年). 数值非货币, 仅用于演化曲线相对对比. 用法见 web/lib/opportunityCost.ts simulateForks().",
+  "baseline": {
+    "age": 24,
+    "familyId": "middle",
+    "regionId": "tier2",
+    "metrics": {
+      "wealth": 30,
+      "identity": 50,
+      "education": 65,
+      "body": 85
+    }
+  },
+  "horizonYears": 20,
+  "forks": [
+    {
+      "id": "stay_local_job",
+      "name": "本地就业(基线)",
+      "brief": "留在新一线/省会从普通岗位起步,稳定但天花板可见; 作为机会成本对照系.",
+      "segments": [
+        {
+          "ageStart": 24,
+          "ageEnd": 27,
+          "label": "起步 3 年",
+          "perYear": { "wealth": 2, "identity": 1, "education": 0, "body": -1 }
+        },
+        {
+          "ageStart": 28,
+          "ageEnd": 33,
+          "label": "中期积累",
+          "perYear": { "wealth": 3, "identity": 1, "education": 0, "body": -1 }
+        },
+        {
+          "ageStart": 34,
+          "ageEnd": 43,
+          "label": "平台期",
+          "perYear": { "wealth": 2, "identity": 0, "education": -1, "body": -2 }
+        }
+      ]
+    },
+    {
+      "id": "study_abroad_master",
+      "name": "出国读硕",
+      "brief": "24-26 岁出国读硕,前期重度消耗资产, 学历与跨文化身份增益,体力压力中等.",
+      "segments": [
+        {
+          "ageStart": 24,
+          "ageEnd": 25,
+          "label": "留学在读",
+          "oneOff": { "wealth": -10, "education": 4 },
+          "perYear": { "wealth": -8, "identity": 1, "education": 6, "body": -1 }
+        },
+        {
+          "ageStart": 26,
+          "ageEnd": 28,
+          "label": "毕业回国 / 海外起步",
+          "oneOff": { "education": 3, "identity": 2 },
+          "perYear": { "wealth": 4, "identity": 2, "education": 1, "body": -1 }
+        },
+        {
+          "ageStart": 29,
+          "ageEnd": 43,
+          "label": "海归 / 海外岗位定型",
+          "perYear": { "wealth": 5, "identity": 1, "education": 0, "body": -2 }
+        }
+      ]
+    },
+    {
+      "id": "civil_service",
+      "name": "考公上岸",
+      "brief": "省直 / 市直公务员, 资产增速温和但稳定, 身份资本持续积累, 体力损耗最低.",
+      "segments": [
+        {
+          "ageStart": 24,
+          "ageEnd": 24,
+          "label": "备考",
+          "oneOff": { "wealth": -2 },
+          "perYear": { "wealth": -1, "identity": 0, "education": 1, "body": 0 }
+        },
+        {
+          "ageStart": 25,
+          "ageEnd": 30,
+          "label": "上岸初期",
+          "oneOff": { "identity": 4 },
+          "perYear": { "wealth": 2, "identity": 2, "education": 0, "body": 0 }
+        },
+        {
+          "ageStart": 31,
+          "ageEnd": 43,
+          "label": "晋升期",
+          "perYear": { "wealth": 2, "identity": 1, "education": 0, "body": -1 }
+        }
+      ]
+    },
+    {
+      "id": "bigtech_high_intensity",
+      "name": "互联网大厂",
+      "brief": "一线大厂高强度岗位, 资产增速最快, 身份与学历微涨, 体力代价最大.",
+      "segments": [
+        {
+          "ageStart": 24,
+          "ageEnd": 27,
+          "label": "校招起步",
+          "oneOff": { "identity": 2 },
+          "perYear": { "wealth": 6, "identity": 1, "education": 0, "body": -3 }
+        },
+        {
+          "ageStart": 28,
+          "ageEnd": 33,
+          "label": "中级 / 高级",
+          "perYear": { "wealth": 8, "identity": 2, "education": 0, "body": -3 }
+        },
+        {
+          "ageStart": 34,
+          "ageEnd": 43,
+          "label": "35+ 平台 / 转型",
+          "perYear": { "wealth": 4, "identity": 0, "education": -1, "body": -4 }
+        }
+      ]
+    }
+  ]
+}
