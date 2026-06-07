@@ -1343,8 +1343,9 @@ export default function SimPage() {
           </div>
         </aside>
 
-        {/* 主区 */}
-        <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
+        {/* 主区 (alt-a: PC 1100px+ 切两列 — 左侧时间轴+状态, 右侧机会窗口直接进入首屏) */}
+        <div className="lqs-sim-content">
+          <div className="lqs-sim-col-left">
           {/* 当前状态卡：资产 / 身份 / 学历 / 身体机能，红/绿涨跌可视化 */}
           <div
             className="lqs-status-cards"
@@ -1604,6 +1605,9 @@ export default function SimPage() {
             本页面展示阶段结构与轻量 SVG 小人成长 / 走路动画，尚未接入随机抽样引擎。
           </div>
 
+          </div>
+          {/* alt-a: PC 右列 */}
+          <div className="lqs-sim-col-right">
           {/* 当前阶段即将错过的人生窗口 · 机会成本 */}
           <section
             aria-labelledby="opportunity-cost-heading"
@@ -1986,6 +1990,7 @@ export default function SimPage() {
               })}
             </ul>
           </section>
+          </div>
         </div>
       </div>
     </section>
