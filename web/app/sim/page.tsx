@@ -512,7 +512,7 @@ export default function SimPage() {
     TALENTS.map((t) => t.id)
   )
   const [showMissed, setShowMissed] = useState<boolean>(false)
-  // 新增：家庭背景过滤（多选）与感情线 / 事业线 tab。
+  // 新增：教养氛围过滤（多选）与感情线 / 事业线 tab。
   const [familyBg, setFamilyBg] = useState<FamilyBackground[]>(
     FAMILY_BACKGROUNDS.map((b) => b.id)
   )
@@ -533,7 +533,7 @@ export default function SimPage() {
     )
   }
 
-  // 根据“家庭背景”多选过滤出“出身家庭”可选项。未选任何背景时，退回全部。
+  // 根据“教养氛围”多选过滤出“出身家庭”可选项。未选任何氛围时，退回全部。
   const visibleFamilies = useMemo(() => {
     if (familyBg.length === 0) return FAMILIES
     const allowed = new Set<string>(
