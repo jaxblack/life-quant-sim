@@ -136,6 +136,182 @@ const STAGES: LifeStage[] = [
 
 const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f9a8d4']
 
+// ----------------------- 人物成长动画 -----------------------
+// 轻量 SVG / CSS 小人: 随阶段变化外观与服装, 并在容器内循环走动。
+// 仅在阶段区域使用, 不跨页面必须事件与点击分叉逻辑。
+// 7 个 stage(childhood/adolescence/early_adult/adult_30s/mid_adult/late_adult/old_age)
+// 都给出: 身高比例 heightScale, 主色 outfitFill, 辅色 hairFill,
+// 可选配饰 accessory ('school'|'tie'|'briefcase'|'cane' 等)。
+// 青年 / 成年 / 中年 三个阶段服装/配饰/体型都明显不同，满足任务必要条件。
+type CharacterAccessory = 'none' | 'school' | 'tie' | 'briefcase' | 'cane'
+type CharacterAppearance = {
+  heightScale: number // 0.55 童年 → 1.0 青/成年 → 0.95 中年 → 0.85 高龄
+  outfitFill: string
+  outfitStroke: string
+  hairFill: string
+  hairStyle: 'short' | 'long' | 'bald' // 头发轮廓
+  accessory: CharacterAccessory
+  caption: string
+}
+const CHARACTER_BY_STAGE: Record<string, CharacterAppearance> = {
+  childhood:    { heightScale: 0.55, outfitFill: '#fbbf24', outfitStroke: '#b45309', hairFill: '#1f2937', hairStyle: 'short', accessory: 'school',     caption: '小学生背包' },
+  adolescence:  { heightScale: 0.78, outfitFill: '#1d4ed8', outfitStroke: '#1e3a8a', hairFill: '#1f2937', hairStyle: 'short', accessory: 'school',     caption: '中学校服' },
+  early_adult:  { heightScale: 1.00, outfitFill: '#0ea5e9', outfitStroke: '#0369a1', hairFill: '#111827', hairStyle: 'short', accessory: 'none',       caption: 'T 恤 + 牛仔' },
+  adult_30s:    { heightScale: 1.00, outfitFill: '#1f2937', outfitStroke: '#0f172a', hairFill: '#111827', hairStyle: 'short', accessory: 'briefcase',  caption: '通勤西装 + 公文包' },
+  mid_adult:    { heightScale: 0.95, outfitFill: '#475569', outfitStroke: '#1e293b', hairFill: '#94a3b8', hairStyle: 'short', accessory: 'tie',        caption: '中年组长颜' },
+  late_adult:   { heightScale: 0.92, outfitFill: '#7c3aed', outfitStroke: '#4c1d95', hairFill: '#cbd5e1', hairStyle: 'short', accessory: 'cane',       caption: '退休休闲装' },
+  old_age:      { heightScale: 0.85, outfitFill: '#9ca3af', outfitStroke: '#4b5563', hairFill: '#e5e7eb', hairStyle: 'bald',  accessory: 'cane',       caption: '高龄助行' },
+}
+function appearanceForStageId(id: string): CharacterAppearance {
+  return CHARACTER_BY_STAGE[id] ?? CHARACTER_BY_STAGE.early_adult
+}
+
+// SVG 小人本体. viewBox 32x64； height 随 heightScale 缩放，身体越低头越大占比。
+// 四肢 / 躯干拆开可供 CSS keyframes 单独驱动。
+function CharacterFigure({ a }: { a: CharacterAppearance }) {
+  const baseW = 32
+  const baseH = 64
+  // 身高随 heightScale, 头部在童年期相对更大（heightScale 越小 → 头占比越大）。
+  const headRBase = 6
+  const headR = headRBase * (1 + (1 - a.heightScale) * 0.5)
+  const figureH = baseH * a.heightScale
+  return (
+    <svg viewBox={`0 0 ${baseW} ${baseH}`} preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+      <g transform={`translate(${baseW / 2}, ${baseH - figureH})`}>
+        {/* 头 */}
+        <circle cx={0} cy={headR} r={headR} fill="#fde68a" stroke="#b45309" strokeWidth={0.6} />
+        {/* 头发 */}
+        {a.hairStyle !== 'bald' && (
+          <path
+            d={
+              a.hairStyle === 'long'
+                ? `M ${-headR} ${headR * 0.8} a ${headR} ${headR} 0 1 1 ${headR * 2} 0 v ${headR * 1.4} h ${-headR * 2} z`
+                : `M ${-headR} ${headR * 0.7} a ${headR} ${headR * 0.9} 0 1 1 ${headR * 2} 0 v ${headR * 0.2} h ${-headR * 2} z`
+            }
+            fill={a.hairFill}
+          />
+        )}
+        {/* 眼睛 */}
+        <circle cx={-headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
+        <circle cx={headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
+        {/* 躯干 */}
+        <rect
+          x={-headR * 0.85}
+          y={headR * 2}
+          width={headR * 1.7}
+          height={figureH * 0.42}
+          rx={1.6}
+          fill={a.outfitFill}
+          stroke={a.outfitStroke}
+          strokeWidth={0.6}
+        />
+        {/* 领带 */}
+        {a.accessory === 'tie' && (
+          <path
+            d={`M 0 ${headR * 2} l -1.2 1.2 l 0.6 ${figureH * 0.18} l 1.2 0 l 0.6 ${-figureH * 0.18} z`}
+            fill="#dc2626"
+          />
+        )}
+        {/* 肩包 (学习阶段) */}
+        {a.accessory === 'school' && (
+          <rect
+            x={-headR * 1.3}
+            y={headR * 2.1}
+            width={1.8}
+            height={figureH * 0.28}
+            rx={0.6}
+            fill="#dc2626"
+          />
+        )}
+        {/* 手提公文包 */}
+        {a.accessory === 'briefcase' && (
+          <rect
+            x={headR * 0.9}
+            y={headR * 2 + figureH * 0.32}
+            width={3}
+            height={2.2}
+            rx={0.4}
+            fill="#1f2937"
+          />
+        )}
+        {/* 拐杖 */}
+        {a.accessory === 'cane' && (
+          <line
+            x1={headR * 1.1}
+            y1={headR * 2 + figureH * 0.12}
+            x2={headR * 1.6}
+            y2={headR * 2 + figureH * 0.6}
+            stroke="#78350f"
+            strokeWidth={1}
+            strokeLinecap="round"
+          />
+        )}
+        {/* 左臂 */}
+        <rect
+          className="lqs-arm-l"
+          x={-headR * 1.05}
+          y={headR * 2 + 0.5}
+          width={1.6}
+          height={figureH * 0.32}
+          rx={0.8}
+          fill={a.outfitStroke}
+        />
+        {/* 右臂 */}
+        <rect
+          className="lqs-arm-r"
+          x={headR * 0.85 - 0.2}
+          y={headR * 2 + 0.5}
+          width={1.6}
+          height={figureH * 0.32}
+          rx={0.8}
+          fill={a.outfitStroke}
+        />
+        {/* 左腿 */}
+        <rect
+          className="lqs-leg-l"
+          x={-headR * 0.55}
+          y={headR * 2 + figureH * 0.42}
+          width={1.8}
+          height={figureH * 0.34}
+          rx={0.8}
+          fill="#0f172a"
+        />
+        {/* 右腿 */}
+        <rect
+          className="lqs-leg-r"
+          x={headR * 0.05}
+          y={headR * 2 + figureH * 0.42}
+          width={1.8}
+          height={figureH * 0.34}
+          rx={0.8}
+          fill="#0f172a"
+        />
+      </g>
+    </svg>
+  )
+}
+
+function CharacterStage({ stageId, age, stageName, regionName, familyName }: { stageId: string; age: number; stageName: string; regionName: string; familyName: string }) {
+  const a = appearanceForStageId(stageId)
+  return (
+    <div
+      className="lqs-character-stage"
+      role="img"
+      aria-label={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人走动动画: ${a.caption}`}
+    >
+      <div className="lqs-character-caption">{age} 岁 · {stageName} · {a.caption}</div>
+      <div className="lqs-character-ground" />
+      <div className="lqs-character-walker">
+        <div className="lqs-character-bob">
+          <div className="lqs-character" style={{ width: '100%' }}>
+            <CharacterFigure a={a} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Region = { id: string; name: string; brief: string }
 type Family = { id: string; name: string; brief: string }
 
@@ -722,7 +898,7 @@ export default function SimPage() {
       <header style={{ display: 'grid', gap: 6 }}>
         <h1 className="lqs-sim-title" style={{ fontSize: 32, margin: 0 }}>人生模拟 Demo</h1>
         <p className="lqs-sim-lede" style={{ color: '#6b7280', margin: 0, lineHeight: 1.7 }}>
-          0-100岁 全程时间轴 · 选择出生地域与出身家庭，拖动滑块查看不同年龄段的状态变化；demo 仅使用轻量 CSS 过渡动画，不做人物成长动画。
+          0-100岁 全程时间轴 · 选择出生地域与出身家庭，拖动滑块查看不同年龄段的状态变化；demo 使用轻量 CSS 过渡 + 轻量 SVG 小人走路 / 成长动画。
         </p>
       </header>
 
@@ -921,6 +1097,14 @@ export default function SimPage() {
               gap: 12,
             }}
           >
+            {/* 人物成长 / 走路动画: 轻量 SVG + CSS, 不依赖表变 / 点击逻辑, 只读 stage 与 age。 */}
+            <CharacterStage
+              stageId={stage.id}
+              age={age}
+              stageName={stage.name}
+              regionName={region.name}
+              familyName={family.name}
+            />
             <div
               style={{
                 display: 'flex',
@@ -1109,7 +1293,7 @@ export default function SimPage() {
           >
             场景假设：在 <strong>{region.name}</strong> 出生、来自 <strong>{family.name}</strong>，
             当前正处于 <strong>{stage.name}</strong> 阶段（{age} 岁）。
-            本页面仅展示阶段结构，尚未接入随机抽样引擎，因此不会播放人物成长动画。
+            本页面展示阶段结构与轻量 SVG 小人成长 / 走路动画，尚未接入随机抽样引擎。
           </div>
 
           {/* 当前阶段即将错过的人生窗口 · 机会成本 */}
