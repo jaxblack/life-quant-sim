@@ -187,76 +187,178 @@ video {
     animation: none !important;
     transition: none !important;
   }
-  /* 角色行走 / 摆臂动画在 reduced-motion 下也停止, 仅保留静态 pose。 */
+  /* 角色相关的所有运动型动画 (走 / 摆臂 / 腿 / 眨眼 / 呼吸 / 阴影 / transition / 配饰摆动) 在 reduced-motion 下统一停止, 仅保留静态 pose. */
   .lqs-character-walker,
   .lqs-character-bob,
   .lqs-character svg .lqs-arm-l,
   .lqs-character svg .lqs-arm-r,
   .lqs-character svg .lqs-leg-l,
-  .lqs-character svg .lqs-leg-r {
+  .lqs-character svg .lqs-leg-r,
+  .lqs-character svg .lqs-eyelid-l,
+  .lqs-character svg .lqs-eyelid-r,
+  .lqs-character svg .lqs-torso-breath,
+  .lqs-character svg .lqs-tie,
+  .lqs-character svg .lqs-cane,
+  .lqs-character svg .lqs-pony-l,
+  .lqs-character svg .lqs-pony-r,
+  .lqs-character-shadow,
+  .lqs-character-stage.lqs-stage-transition,
+  .lqs-character-stage.lqs-stage-transition .lqs-character-bob,
+  .lqs-character-stage.lqs-stage-transition .lqs-character-walker {
     animation: none !important;
   }
 }
 
-/* ----------------------- 人物成长动画 ----------------------- */
-/* 轻量 CSS / SVG 实现, 不引入新依赖. 三组关键帧:               */
-/*   1) lqs-walk-x : 角色在容器内左右循环行走的水平位移          */
-/*   2) lqs-bob    : 走路时身体的上下小幅弹跳                  */
-/*   3) lqs-swing-* : 四肢前后摆动 (左右臂腿使用相反方向)        */
+/* ----------------------- 人物成长动画 (专业版) ----------------------- */
+/* 设计目标:                                                            */
+/*   - idle 呼吸 + 偶尔眨眼;                                             */
+/*   - walk 时四肢自然摆动 + 躯干轻微 bob + 地面阴影同步;                  */
+/*   - 阶段切换 (stageId 改变) 时给容器加 .lqs-stage-transition 类,        */
+/*     播放一次 fade + 微弹 grow-in;                                     */
+/*   - 速度通过 CSS 变量 --lqs-walk-speed / --lqs-bob-speed 在容器上覆写, */
+/*     童年 / 中年 / 高龄各自步速不同;                                    */
+/*   - 仅 CSS + 内联 SVG, 不引入新依赖.                                  */
+
 @keyframes lqs-walk-x {
-  0% { transform: translateX(0); }
-  48% { transform: translateX(calc(100% - 56px)); }
-  50% { transform: translateX(calc(100% - 56px)) scaleX(-1); }
-  98% { transform: translateX(0) scaleX(-1); }
+  0%   { transform: translateX(0); }
+  48%  { transform: translateX(calc(100% - var(--lqs-walker-w, 56px))); }
+  50%  { transform: translateX(calc(100% - var(--lqs-walker-w, 56px))) scaleX(-1); }
+  98%  { transform: translateX(0) scaleX(-1); }
   100% { transform: translateX(0); }
 }
 @keyframes lqs-bob {
   0%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-2px); }
-  50% { transform: translateY(0); }
-  75% { transform: translateY(-2px); }
+  25%      { transform: translateY(calc(var(--lqs-bob-amp, 2px) * -1)); }
+  50%      { transform: translateY(0); }
+  75%      { transform: translateY(calc(var(--lqs-bob-amp, 2px) * -1)); }
 }
+/* 四肢摆动: 用 cubic-bezier 让起止收得更利落, 像真实步态. */
 @keyframes lqs-swing-fwd {
-  0%, 100% { transform: rotate(-22deg); }
-  50% { transform: rotate(22deg); }
+  0%, 100% { transform: rotate(-26deg); }
+  50%      { transform: rotate(26deg); }
 }
 @keyframes lqs-swing-bwd {
-  0%, 100% { transform: rotate(22deg); }
-  50% { transform: rotate(-22deg); }
+  0%, 100% { transform: rotate(26deg); }
+  50%      { transform: rotate(-26deg); }
+}
+/* 老年/驼背: 摆动幅度更小. */
+@keyframes lqs-swing-fwd-soft {
+  0%, 100% { transform: rotate(-12deg); }
+  50%      { transform: rotate(12deg); }
+}
+@keyframes lqs-swing-bwd-soft {
+  0%, 100% { transform: rotate(12deg); }
+  50%      { transform: rotate(-12deg); }
+}
+/* idle 呼吸: 躯干极小幅 scale, 看上去是吸气. */
+@keyframes lqs-breath {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50%      { transform: scaleY(1.012) translateY(-0.3px); }
+}
+/* 眨眼: 大部分时间睁眼 (scaleY=0), 在 96-100% 闭一下. */
+@keyframes lqs-blink {
+  0%, 92%, 100% { transform: scaleY(0.05); }
+  95%, 98%      { transform: scaleY(1); }
+}
+/* 地面影子随脚步同步缩放 (踩地节拍). 保留 translateX(-50%) 用于中心定位. */
+@keyframes lqs-shadow-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.32; }
+  25%      { transform: translateX(-50%) scale(0.85, 0.78); opacity: 0.42; }
+  50%      { transform: translateX(-50%) scale(1); opacity: 0.32; }
+  75%      { transform: translateX(-50%) scale(0.85, 0.78); opacity: 0.42; }
+}
+/* 阶段切换: 角色淡入 + 短弹. */
+@keyframes lqs-grow-in {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.92); }
+  60%  { opacity: 1; transform: translateY(-1px) scale(1.03); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 领带 / 围巾 / 马尾 / 拐杖等附属配饰的轻微跟随摆动. */
+@keyframes lqs-tie-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50%      { transform: rotate(4deg); }
+}
+@keyframes lqs-cane-tap {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50%      { transform: rotate(2deg) translateY(0.5px); }
 }
 
+/* ---- 舞台容器 ---- */
 .lqs-character-stage {
   position: relative;
   width: 100%;
-  height: 96px;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  height: 110px;
+  /* 三段叠加: 远天 → 远山雾 → 近地. */
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 105%, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0) 60%),
+    linear-gradient(180deg, #eaf2ff 0%, #f6f8fb 55%, #e9edf3 100%);
+  border: 1px solid #dbe1ea;
+  border-radius: 14px;
   overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -8px 14px rgba(15, 23, 42, 0.06);
+  /* 阶段速度变量, 子选择器可覆写. */
+  --lqs-walk-speed: 8.5s;
+  --lqs-bob-speed: 0.85s;
+  --lqs-bob-amp: 2.5px;
+  --lqs-walker-w: 60px;
 }
+
+/* 远景: 一条柔和的远山剪影 + 雾. 仅装饰, 不参与动画. */
+.lqs-character-stage::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  height: 30px;
+  background:
+    linear-gradient(180deg, rgba(148, 163, 184, 0) 0%, rgba(148, 163, 184, 0.18) 100%),
+    radial-gradient(ellipse 30% 90% at 18% 100%, rgba(100, 116, 139, 0.32) 0%, rgba(100, 116, 139, 0) 70%),
+    radial-gradient(ellipse 35% 100% at 55% 100%, rgba(100, 116, 139, 0.24) 0%, rgba(100, 116, 139, 0) 70%),
+    radial-gradient(ellipse 28% 90% at 88% 100%, rgba(100, 116, 139, 0.28) 0%, rgba(100, 116, 139, 0) 70%);
+  filter: blur(0.4px);
+  pointer-events: none;
+}
+
+/* 近地面: 重做地面纹理为渐隐网格, 且贴底. */
 .lqs-character-ground {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 16px;
-  background: repeating-linear-gradient(
-    90deg,
-    #d1d5db 0 8px,
-    transparent 8px 16px
-  );
-  opacity: 0.55;
+  height: 22px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.06) 100%),
+    repeating-linear-gradient(90deg, rgba(71, 85, 105, 0.18) 0 1px, transparent 1px 14px);
 }
+
+/* 角色阴影: 椭圆, 被 walker 携带横移 (所以在 walker 内部 / bob 外部). 踏地节拍使它 pulse. */
+.lqs-character-shadow {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--lqs-walker-w, 60px) * 0.55);
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0) 70%);
+  filter: blur(0.6px);
+  transform-origin: center center;
+  animation: lqs-shadow-pulse var(--lqs-bob-speed) ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* 走路容器: 横向位移 + 翻面. */
 .lqs-character-walker {
   position: absolute;
-  bottom: 14px;
+  bottom: 18px;
   left: 0;
-  width: 56px;
-  animation: lqs-walk-x 9s ease-in-out infinite;
+  width: var(--lqs-walker-w, 60px);
+  animation: lqs-walk-x var(--lqs-walk-speed) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
   will-change: transform;
 }
 .lqs-character-bob {
-  animation: lqs-bob 0.9s ease-in-out infinite;
+  animation: lqs-bob var(--lqs-bob-speed) ease-in-out infinite;
   display: block;
   transform-origin: center bottom;
 }
@@ -264,27 +366,112 @@ video {
   display: block;
   width: 100%;
   height: auto;
+  overflow: visible;
 }
+
+/* 四肢摆动. */
 .lqs-character svg .lqs-arm-l,
 .lqs-character svg .lqs-leg-r {
   transform-box: fill-box;
   transform-origin: top center;
-  animation: lqs-swing-fwd 0.9s ease-in-out infinite;
+  animation: lqs-swing-fwd var(--lqs-bob-speed) cubic-bezier(0.55, 0, 0.45, 1) infinite;
 }
 .lqs-character svg .lqs-arm-r,
 .lqs-character svg .lqs-leg-l {
   transform-box: fill-box;
   transform-origin: top center;
-  animation: lqs-swing-bwd 0.9s ease-in-out infinite;
+  animation: lqs-swing-bwd var(--lqs-bob-speed) cubic-bezier(0.55, 0, 0.45, 1) infinite;
 }
+
+/* 老年/驼背版本: 摆动幅度更小 (容器加 .lqs-pose-stooped 类). */
+.lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-arm-l,
+.lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-leg-r {
+  animation-name: lqs-swing-fwd-soft;
+}
+.lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-arm-r,
+.lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-leg-l {
+  animation-name: lqs-swing-bwd-soft;
+}
+.lqs-character-stage.lqs-pose-stooped .lqs-character {
+  /* 整体微微前倾 + 缩一点, 模拟驼背. */
+  transform: translateY(1px) rotate(2.5deg);
+  transform-origin: center bottom;
+}
+
+/* 童年/少年版本: 弹跳更高一点, 头部相对更大. */
+.lqs-character-stage.lqs-pose-bouncy {
+  --lqs-bob-amp: 4px;
+}
+
+/* idle 呼吸 (走路时也叠加, 让胸口看上去会起伏一点). */
+.lqs-character svg .lqs-torso-breath {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lqs-breath 3.6s ease-in-out infinite;
+}
+/* 眨眼: 上眼皮 rect 默认压平 (scaleY=0.05), 偶发瞬间 scaleY=1 闭眼. */
+.lqs-character svg .lqs-eyelid-l,
+.lqs-character svg .lqs-eyelid-r {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lqs-blink 5.4s ease-in-out infinite;
+}
+.lqs-character svg .lqs-eyelid-r {
+  /* 错开一点点, 避免完全同步像机器. */
+  animation-delay: 0.05s;
+}
+
+/* 配饰摆动. */
+.lqs-character svg .lqs-tie {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: lqs-tie-sway calc(var(--lqs-bob-speed) * 1.4) ease-in-out infinite;
+}
+.lqs-character svg .lqs-pony-l {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: lqs-tie-sway calc(var(--lqs-bob-speed) * 1.05) ease-in-out infinite;
+}
+.lqs-character svg .lqs-pony-r {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: lqs-tie-sway calc(var(--lqs-bob-speed) * 1.05) ease-in-out infinite reverse;
+}
+.lqs-character svg .lqs-cane {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: lqs-cane-tap var(--lqs-bob-speed) ease-in-out infinite;
+}
+
+/* 阶段切换: 容器加 .lqs-stage-transition, 在角色 fade + 微弹上画一次. */
+@keyframes lqs-stage-fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.lqs-character-stage.lqs-stage-transition .lqs-character-bob {
+  /* 限定只影响 bob 层 (不覆盖 walker 的 walk-x), 加一次性 grow-in 叠加到原 bob 上. */
+  animation: lqs-grow-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both, lqs-bob var(--lqs-bob-speed) ease-in-out infinite;
+}
+.lqs-character-stage.lqs-stage-transition {
+  animation: lqs-stage-fade-in 0.4s ease-out both;
+}
+
 .lqs-character-caption {
   position: absolute;
-  top: 6px;
-  left: 10px;
+  top: 8px;
+  left: 12px;
   font-size: 11px;
-  color: #6b7280;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  padding: 2px 8px;
+  border-radius: 999px;
+  backdrop-filter: blur(2px);
 }
+
 @media (max-width: 640px) {
-  .lqs-character-stage { height: 80px; }
-  .lqs-character-walker { width: 44px; }
+  .lqs-character-stage {
+    height: 92px;
+    --lqs-walker-w: 48px;
+  }
 }

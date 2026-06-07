@@ -143,149 +143,319 @@ const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f
 // 都给出: 身高比例 heightScale, 主色 outfitFill, 辅色 hairFill,
 // 可选配饰 accessory ('school'|'tie'|'briefcase'|'cane' 等)。
 // 青年 / 成年 / 中年 三个阶段服装/配饰/体型都明显不同，满足任务必要条件。
-type CharacterAccessory = 'none' | 'school' | 'tie' | 'briefcase' | 'cane'
+type CharacterAccessory = 'none' | 'school' | 'school_tie' | 'headphones' | 'tie' | 'briefcase' | 'cane' | 'cane_glasses'
+type Mouth = 'big-smile' | 'smile' | 'calm' | 'firm' | 'soft-down'
+type Posture = 'upright' | 'leaning-fwd' | 'stooped' | 'bouncy'
+type HairStyle = 'pony-twin' | 'short' | 'medium' | 'thinning' | 'bald-top' | 'bald'
 type CharacterAppearance = {
   heightScale: number // 0.55 童年 → 1.0 青/成年 → 0.95 中年 → 0.85 高龄
   outfitFill: string
   outfitStroke: string
+  outfitFillLight: string // 衣服渐变亮色
+  outfitFillDark: string  // 衣服渐变暗色
+  legFill: string         // 裤子颜色
   hairFill: string
-  hairStyle: 'short' | 'long' | 'bald' // 头发轮廓
+  hairHighlight: string   // 发丝高光
+  hairStyle: HairStyle
+  skinFill: string
+  skinShade: string
+  mouth: Mouth
+  posture: Posture
+  walkSpeedSec: number    // 走路周期
+  bobSpeedSec: number     // 步频
+  bobAmpPx: number        // 弹跳幅度
+  paunch: boolean         // 中年微肚
   accessory: CharacterAccessory
   caption: string
 }
 const CHARACTER_BY_STAGE: Record<string, CharacterAppearance> = {
-  childhood:    { heightScale: 0.55, outfitFill: '#fbbf24', outfitStroke: '#b45309', hairFill: '#1f2937', hairStyle: 'short', accessory: 'school',     caption: '小学生背包' },
-  adolescence:  { heightScale: 0.78, outfitFill: '#1d4ed8', outfitStroke: '#1e3a8a', hairFill: '#1f2937', hairStyle: 'short', accessory: 'school',     caption: '中学校服' },
-  early_adult:  { heightScale: 1.00, outfitFill: '#0ea5e9', outfitStroke: '#0369a1', hairFill: '#111827', hairStyle: 'short', accessory: 'none',       caption: 'T 恤 + 牛仔' },
-  adult_30s:    { heightScale: 1.00, outfitFill: '#1f2937', outfitStroke: '#0f172a', hairFill: '#111827', hairStyle: 'short', accessory: 'briefcase',  caption: '通勤西装 + 公文包' },
-  mid_adult:    { heightScale: 0.95, outfitFill: '#475569', outfitStroke: '#1e293b', hairFill: '#94a3b8', hairStyle: 'short', accessory: 'tie',        caption: '中年组长颜' },
-  late_adult:   { heightScale: 0.92, outfitFill: '#7c3aed', outfitStroke: '#4c1d95', hairFill: '#cbd5e1', hairStyle: 'short', accessory: 'cane',       caption: '退休休闲装' },
-  old_age:      { heightScale: 0.85, outfitFill: '#9ca3af', outfitStroke: '#4b5563', hairFill: '#e5e7eb', hairStyle: 'bald',  accessory: 'cane',       caption: '高龄助行' },
+  childhood: {
+    heightScale: 0.55,
+    outfitFill: '#fbbf24', outfitStroke: '#b45309',
+    outfitFillLight: '#fef3c7', outfitFillDark: '#f59e0b',
+    legFill: '#1d4ed8',
+    hairFill: '#1f2937', hairHighlight: '#374151',
+    hairStyle: 'pony-twin',
+    skinFill: '#fde7c4', skinShade: '#f1c596',
+    mouth: 'big-smile', posture: 'bouncy',
+    walkSpeedSec: 6.5, bobSpeedSec: 0.7, bobAmpPx: 4,
+    paunch: false,
+    accessory: 'school',
+    caption: '小学生背包',
+  },
+  adolescence: {
+    heightScale: 0.78,
+    outfitFill: '#1d4ed8', outfitStroke: '#1e3a8a',
+    outfitFillLight: '#3b82f6', outfitFillDark: '#1d4ed8',
+    legFill: '#1e3a8a',
+    hairFill: '#0f172a', hairHighlight: '#1f2937',
+    hairStyle: 'medium',
+    skinFill: '#fde7c4', skinShade: '#f1c596',
+    mouth: 'smile', posture: 'upright',
+    walkSpeedSec: 7.5, bobSpeedSec: 0.8, bobAmpPx: 3,
+    paunch: false,
+    accessory: 'school_tie',
+    caption: '中学校服',
+  },
+  early_adult: {
+    heightScale: 1.00,
+    outfitFill: '#0ea5e9', outfitStroke: '#0369a1',
+    outfitFillLight: '#38bdf8', outfitFillDark: '#0284c7',
+    legFill: '#1e293b',
+    hairFill: '#0f172a', hairHighlight: '#374151',
+    hairStyle: 'short',
+    skinFill: '#fde7c4', skinShade: '#f1c596',
+    mouth: 'smile', posture: 'upright',
+    walkSpeedSec: 8.0, bobSpeedSec: 0.85, bobAmpPx: 2.5,
+    paunch: false,
+    accessory: 'headphones',
+    caption: 'T 恤 + 牛仔 + 耳机',
+  },
+  adult_30s: {
+    heightScale: 1.00,
+    outfitFill: '#1f2937', outfitStroke: '#0f172a',
+    outfitFillLight: '#334155', outfitFillDark: '#0f172a',
+    legFill: '#0f172a',
+    hairFill: '#0f172a', hairHighlight: '#1f2937',
+    hairStyle: 'short',
+    skinFill: '#fde7c4', skinShade: '#e5b591',
+    mouth: 'firm', posture: 'leaning-fwd',
+    walkSpeedSec: 7.0, bobSpeedSec: 0.78, bobAmpPx: 2.2,
+    paunch: false,
+    accessory: 'briefcase',
+    caption: '通勤西装 + 公文包',
+  },
+  mid_adult: {
+    heightScale: 0.96,
+    outfitFill: '#475569', outfitStroke: '#1e293b',
+    outfitFillLight: '#64748b', outfitFillDark: '#334155',
+    legFill: '#1e293b',
+    hairFill: '#94a3b8', hairHighlight: '#cbd5e1',
+    hairStyle: 'thinning',
+    skinFill: '#fbe1c0', skinShade: '#d4a07a',
+    mouth: 'calm', posture: 'upright',
+    walkSpeedSec: 8.5, bobSpeedSec: 0.9, bobAmpPx: 2,
+    paunch: true,
+    accessory: 'tie',
+    caption: '中年组长颜',
+  },
+  late_adult: {
+    heightScale: 0.92,
+    outfitFill: '#7c3aed', outfitStroke: '#4c1d95',
+    outfitFillLight: '#a78bfa', outfitFillDark: '#7c3aed',
+    legFill: '#1f2937',
+    hairFill: '#cbd5e1', hairHighlight: '#e2e8f0',
+    hairStyle: 'thinning',
+    skinFill: '#f5d4ad', skinShade: '#c89066',
+    mouth: 'calm', posture: 'upright',
+    walkSpeedSec: 9.5, bobSpeedSec: 1.0, bobAmpPx: 1.6,
+    paunch: true,
+    accessory: 'cane',
+    caption: '退休休闲装',
+  },
+  old_age: {
+    heightScale: 0.85,
+    outfitFill: '#9ca3af', outfitStroke: '#4b5563',
+    outfitFillLight: '#cbd5e1', outfitFillDark: '#94a3b8',
+    legFill: '#475569',
+    hairFill: '#e5e7eb', hairHighlight: '#f1f5f9',
+    hairStyle: 'bald-top',
+    skinFill: '#ecd2ad', skinShade: '#b8845b',
+    mouth: 'soft-down', posture: 'stooped',
+    walkSpeedSec: 11.5, bobSpeedSec: 1.2, bobAmpPx: 1.2,
+    paunch: false,
+    accessory: 'cane_glasses',
+    caption: '高龄助行',
+  },
 }
 function appearanceForStageId(id: string): CharacterAppearance {
   return CHARACTER_BY_STAGE[id] ?? CHARACTER_BY_STAGE.early_adult
 }
 
-// SVG 小人本体. viewBox 32x64； height 随 heightScale 缩放，身体越低头越大占比。
-// 四肢 / 躯干拆开可供 CSS keyframes 单独驱动。
-function CharacterFigure({ a }: { a: CharacterAppearance }) {
-  const baseW = 32
-  const baseH = 64
-  // 身高随 heightScale, 头部在童年期相对更大（heightScale 越小 → 头占比越大）。
+// 嘴形 path. 起点 (0,0), 在 head 局部坐标里被平移使用.
+function mouthPath(m: Mouth): string {
+  switch (m) {
+    case 'big-smile': return 'M -1.6 0 q 1.6 1.8 3.2 0'
+    case 'smile':     return 'M -1.4 0 q 1.4 1.0 2.8 0'
+    case 'calm':      return 'M -1.4 0 l 2.8 0'
+    case 'firm':      return 'M -1.5 0 l 3.0 0'
+    case 'soft-down': return 'M -1.4 0 q 1.4 -0.8 2.8 0'
+  }
+}
+
+// 头发主体 path. 童年期 hairStyle='pony-twin' 时上层另叠双马尾 (不在这里返回).
+function hairMainPath(style: HairStyle, headR: number): string | null {
+  if (style === 'bald') return null
+  if (style === 'bald-top') {
+    return `M ${-headR * 0.95} ${headR * 1.05} q ${headR * 0.05} ${-headR * 0.4} ${headR * 0.55} ${-headR * 0.55} l ${headR * 0.85} 0 q ${headR * 0.5} ${headR * 0.15} ${headR * 0.55} ${headR * 0.55} l 0 ${headR * 0.2} q ${-headR * 0.6} ${-headR * 0.05} ${-headR * 1.2} 0 q ${-headR * 0.6} ${-headR * 0.05} ${-headR * 0.85} ${-headR * 0.2} z`
+  }
+  if (style === 'thinning') {
+    return `M ${-headR} ${headR * 0.85} q ${headR * 0.55} ${-headR * 0.7} ${headR * 1.0} ${-headR * 0.85} q ${headR * 0.45} ${headR * 0.05} ${headR} ${headR * 0.4} v ${headR * 0.5} q ${-headR} ${-headR * 0.1} ${-headR * 2} 0 z`
+  }
+  if (style === 'medium') {
+    return `M ${-headR * 1.05} ${headR * 0.6} q ${headR} ${-headR * 1.1} ${headR * 2.1} 0 v ${headR * 0.7} q ${-headR * 1.05} ${-headR * 0.05} ${-headR * 2.1} 0 z`
+  }
+  if (style === 'pony-twin') {
+    return `M ${-headR * 1.0} ${headR * 0.55} q ${headR} ${-headR * 1.05} ${headR * 2.0} 0 v ${headR * 0.55} q ${-headR * 1.0} ${-headR * 0.05} ${-headR * 2.0} 0 z`
+  }
+  return `M ${-headR} ${headR * 0.65} q ${headR} ${-headR * 0.95} ${headR * 2} 0 v ${headR * 0.35} q ${-headR} ${-headR * 0.05} ${-headR * 2} 0 z`
+}
+
+// SVG 小人本体: 分层 (后腿 → 后臂 → 躯干呼吸 → 前腿 → 鞋 → 前臂 → 配饰 → 头 → 五官 → 头发).
+function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string }) {
+  const baseW = 36
+  const baseH = 72
   const headRBase = 6
-  const headR = headRBase * (1 + (1 - a.heightScale) * 0.5)
+  const headR = headRBase * (1 + (1 - a.heightScale) * 0.55)
   const figureH = baseH * a.heightScale
+  const torsoTop = headR * 2
+  const torsoH = figureH * 0.42
+  const legTop = torsoTop + torsoH * (a.paunch ? 0.96 : 1.0)
+  const legH = figureH * 0.34
+  const limbW = 1.8
+  const armH = torsoH * 0.92
+
+  const outfitGrad = `${gradId}-outfit`
+  const hairGrad = `${gradId}-hair`
+  const skinGrad = `${gradId}-skin`
+
+  const groupRotate =
+    a.posture === 'leaning-fwd' ? -2 :
+    a.posture === 'stooped'     ? 3  : 0
+
+  const mouthD = mouthPath(a.mouth)
+  const mainHairD = hairMainPath(a.hairStyle, headR)
+
   return (
     <svg viewBox={`0 0 ${baseW} ${baseH}`} preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-      <g transform={`translate(${baseW / 2}, ${baseH - figureH})`}>
-        {/* 头 */}
-        <circle cx={0} cy={headR} r={headR} fill="#fde68a" stroke="#b45309" strokeWidth={0.6} />
-        {/* 头发 */}
-        {a.hairStyle !== 'bald' && (
+      <defs>
+        <linearGradient id={outfitGrad} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={a.outfitFillLight} />
+          <stop offset="55%" stopColor={a.outfitFillLight} />
+          <stop offset="100%" stopColor={a.outfitFillDark} />
+        </linearGradient>
+        <linearGradient id={hairGrad} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={a.hairHighlight} />
+          <stop offset="40%" stopColor={a.hairFill} />
+          <stop offset="100%" stopColor={a.hairFill} />
+        </linearGradient>
+        <linearGradient id={skinGrad} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={a.skinFill} />
+          <stop offset="100%" stopColor={a.skinShade} />
+        </linearGradient>
+      </defs>
+
+      <g transform={`translate(${baseW / 2}, ${baseH - figureH}) rotate(${groupRotate})`}>
+        <rect className="lqs-leg-r" x={headR * 0.05} y={legTop} width={limbW} height={legH} rx={0.9} fill={a.legFill} />
+        <rect className="lqs-arm-r" x={headR * 0.85 - 0.2} y={torsoTop + 0.6} width={limbW * 0.95} height={armH} rx={0.9} fill={a.outfitStroke} />
+
+        <g className="lqs-torso-breath">
           <path
             d={
-              a.hairStyle === 'long'
-                ? `M ${-headR} ${headR * 0.8} a ${headR} ${headR} 0 1 1 ${headR * 2} 0 v ${headR * 1.4} h ${-headR * 2} z`
-                : `M ${-headR} ${headR * 0.7} a ${headR} ${headR * 0.9} 0 1 1 ${headR * 2} 0 v ${headR * 0.2} h ${-headR * 2} z`
+              a.paunch
+                ? `M ${-headR * 0.95} ${torsoTop} L ${headR * 0.95} ${torsoTop} Q ${headR * 1.4} ${torsoTop + torsoH * 0.5} ${headR * 0.85} ${torsoTop + torsoH} L ${-headR * 0.85} ${torsoTop + torsoH} Q ${-headR * 1.4} ${torsoTop + torsoH * 0.5} ${-headR * 0.95} ${torsoTop} z`
+                : `M ${-headR * 0.95} ${torsoTop} L ${headR * 0.95} ${torsoTop} L ${headR * 0.78} ${torsoTop + torsoH} L ${-headR * 0.78} ${torsoTop + torsoH} z`
             }
-            fill={a.hairFill}
+            fill={`url(#${outfitGrad})`}
+            stroke={a.outfitStroke}
+            strokeWidth={0.6}
           />
+          <line x1={0} y1={torsoTop + 1} x2={0} y2={torsoTop + torsoH - 1} stroke="rgba(255,255,255,0.35)" strokeWidth={0.5} />
+          {(a.accessory === 'tie' || a.accessory === 'briefcase') && (
+            <path
+              d={`M -0.9 ${torsoTop + 0.3} L 0.9 ${torsoTop + 0.3} L 0 ${torsoTop + torsoH * 0.45} z`}
+              fill="#f8fafc"
+              stroke="#cbd5e1"
+              strokeWidth={0.3}
+            />
+          )}
+          {a.accessory === 'school_tie' && (
+            <rect x={-headR * 0.95} y={torsoTop} width={headR * 1.9} height={1.2} fill="#facc15" />
+          )}
+        </g>
+
+        <rect className="lqs-leg-l" x={-headR * 0.55} y={legTop} width={limbW} height={legH} rx={0.9} fill={a.legFill} />
+        <ellipse cx={-headR * 0.55 + limbW / 2} cy={legTop + legH + 0.6} rx={1.6} ry={0.7} fill="#0f172a" />
+        <ellipse cx={ headR * 0.05 + limbW / 2} cy={legTop + legH + 0.6} rx={1.6} ry={0.7} fill="#0f172a" />
+
+        <rect className="lqs-arm-l" x={-headR * 1.05} y={torsoTop + 0.6} width={limbW * 0.95} height={armH} rx={0.9} fill={a.outfitStroke} />
+
+        {a.accessory === 'briefcase' && (
+          <g>
+            <rect x={headR * 0.95} y={torsoTop + armH * 0.95} width={3.4} height={2.6} rx={0.5} fill="#1f2937" stroke="#0f172a" strokeWidth={0.4} />
+            <line x1={headR * 0.95 + 0.4} y1={torsoTop + armH * 0.95} x2={headR * 0.95 + 0.4} y2={torsoTop + armH * 0.85} stroke="#1f2937" strokeWidth={0.5} />
+            <line x1={headR * 0.95 + 3.0} y1={torsoTop + armH * 0.95} x2={headR * 0.95 + 3.0} y2={torsoTop + armH * 0.85} stroke="#1f2937" strokeWidth={0.5} />
+          </g>
         )}
-        {/* 眼睛 */}
-        <circle cx={-headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
-        <circle cx={headR * 0.35} cy={headR * 0.95} r={0.7} fill="#111827" />
-        {/* 躯干 */}
-        <rect
-          x={-headR * 0.85}
-          y={headR * 2}
-          width={headR * 1.7}
-          height={figureH * 0.42}
-          rx={1.6}
-          fill={a.outfitFill}
-          stroke={a.outfitStroke}
-          strokeWidth={0.6}
-        />
-        {/* 领带 */}
+        {(a.accessory === 'cane' || a.accessory === 'cane_glasses') && (
+          <g className="lqs-cane">
+            <line x1={headR * 1.15} y1={torsoTop + armH * 0.55} x2={headR * 1.7} y2={legTop + legH + 0.4} stroke="#7c2d12" strokeWidth={1.1} strokeLinecap="round" />
+            <path d={`M ${headR * 1.05} ${torsoTop + armH * 0.55} q -0.3 -1.1 0.6 -1.4 q 1.0 -0.2 0.9 0.9`} fill="none" stroke="#7c2d12" strokeWidth={1.0} strokeLinecap="round" />
+          </g>
+        )}
+        {(a.accessory === 'school' || a.accessory === 'school_tie') && (
+          <rect x={-headR * 1.35} y={torsoTop + 0.4} width={2.0} height={armH * 0.85} rx={0.6} fill="#dc2626" />
+        )}
         {a.accessory === 'tie' && (
           <path
-            d={`M 0 ${headR * 2} l -1.2 1.2 l 0.6 ${figureH * 0.18} l 1.2 0 l 0.6 ${-figureH * 0.18} z`}
+            className="lqs-tie"
+            d={`M -0.9 ${torsoTop + 0.5} L 0.9 ${torsoTop + 0.5} L 0.5 ${torsoTop + 1.5} L 1.1 ${torsoTop + torsoH * 0.7} L -1.1 ${torsoTop + torsoH * 0.7} L -0.5 ${torsoTop + 1.5} z`}
             fill="#dc2626"
+            stroke="#7f1d1d"
+            strokeWidth={0.3}
           />
         )}
-        {/* 肩包 (学习阶段) */}
-        {a.accessory === 'school' && (
-          <rect
-            x={-headR * 1.3}
-            y={headR * 2.1}
-            width={1.8}
-            height={figureH * 0.28}
-            rx={0.6}
-            fill="#dc2626"
-          />
+
+        <rect x={-headR * 0.35} y={headR * 1.85} width={headR * 0.7} height={headR * 0.4} fill={`url(#${skinGrad})`} />
+        <circle cx={0} cy={headR} r={headR} fill={`url(#${skinGrad})`} stroke={a.skinShade} strokeWidth={0.4} />
+        <ellipse cx={-headR * 0.55} cy={headR * 1.25} rx={1.1} ry={0.6} fill="rgba(244,114,182,0.45)" />
+        <ellipse cx={ headR * 0.55} cy={headR * 1.25} rx={1.1} ry={0.6} fill="rgba(244,114,182,0.45)" />
+
+        <line x1={-headR * 0.6} y1={headR * 0.75} x2={-headR * 0.18} y2={headR * 0.7} stroke={a.hairFill} strokeWidth={0.7} strokeLinecap="round" />
+        <line x1={ headR * 0.18} y1={headR * 0.7}  x2={ headR * 0.6}  y2={headR * 0.75} stroke={a.hairFill} strokeWidth={0.7} strokeLinecap="round" />
+
+        <circle cx={-headR * 0.35} cy={headR * 1.0} r={1.1} fill="#ffffff" stroke="#0f172a" strokeWidth={0.3} />
+        <circle cx={-headR * 0.35} cy={headR * 1.05} r={0.55} fill="#1f2937" />
+        <circle cx={-headR * 0.32} cy={headR * 0.95} r={0.18} fill="#ffffff" />
+        <rect className="lqs-eyelid-l" x={-headR * 0.35 - 1.1} y={headR * 1.0 - 1.1} width={2.2} height={1.2} fill={a.skinFill} stroke="#0f172a" strokeWidth={0.3} />
+        <circle cx={ headR * 0.35} cy={headR * 1.0} r={1.1} fill="#ffffff" stroke="#0f172a" strokeWidth={0.3} />
+        <circle cx={ headR * 0.35} cy={headR * 1.05} r={0.55} fill="#1f2937" />
+        <circle cx={ headR * 0.38} cy={headR * 0.95} r={0.18} fill="#ffffff" />
+        <rect className="lqs-eyelid-r" x={headR * 0.35 - 1.1} y={headR * 1.0 - 1.1} width={2.2} height={1.2} fill={a.skinFill} stroke="#0f172a" strokeWidth={0.3} />
+
+        {a.accessory === 'cane_glasses' && (
+          <g stroke="#1f2937" strokeWidth={0.4} fill="none">
+            <circle cx={-headR * 0.35} cy={headR * 1.0} r={1.5} />
+            <circle cx={ headR * 0.35} cy={headR * 1.0} r={1.5} />
+            <line x1={-headR * 0.35 + 1.5} y1={headR * 1.0} x2={headR * 0.35 - 1.5} y2={headR * 1.0} />
+            <line x1={-headR * 0.85} y1={headR * 1.0} x2={-headR * 1.05} y2={headR * 0.95} />
+            <line x1={ headR * 0.85} y1={headR * 1.0} x2={ headR * 1.05} y2={headR * 0.95} />
+          </g>
         )}
-        {/* 手提公文包 */}
-        {a.accessory === 'briefcase' && (
-          <rect
-            x={headR * 0.9}
-            y={headR * 2 + figureH * 0.32}
-            width={3}
-            height={2.2}
-            rx={0.4}
-            fill="#1f2937"
-          />
+
+        {a.accessory === 'headphones' && (
+          <g>
+            <path d={`M ${-headR * 0.95} ${headR * 0.6} q ${headR * 0.95} ${-headR * 0.95} ${headR * 1.9} 0`} fill="none" stroke="#0f172a" strokeWidth={0.7} strokeLinecap="round" />
+            <ellipse cx={-headR * 0.95} cy={headR * 0.95} rx={0.9} ry={1.1} fill="#0f172a" />
+            <ellipse cx={ headR * 0.95} cy={headR * 0.95} rx={0.9} ry={1.1} fill="#0f172a" />
+          </g>
         )}
-        {/* 拐杖 */}
-        {a.accessory === 'cane' && (
-          <line
-            x1={headR * 1.1}
-            y1={headR * 2 + figureH * 0.12}
-            x2={headR * 1.6}
-            y2={headR * 2 + figureH * 0.6}
-            stroke="#78350f"
-            strokeWidth={1}
-            strokeLinecap="round"
-          />
+
+        <path d={mouthD} transform={`translate(0, ${headR * 1.45})`} fill="none" stroke="#7f1d1d" strokeWidth={0.7} strokeLinecap="round" />
+
+        {mainHairD && (
+          <g>
+            <path d={mainHairD} fill={`url(#${hairGrad})`} stroke={a.hairFill} strokeWidth={0.3} />
+            <path d={`M ${-headR * 0.6} ${headR * 0.55} q ${headR * 0.4} ${-headR * 0.3} ${headR * 0.9} ${-headR * 0.05}`} fill="none" stroke={a.hairHighlight} strokeWidth={0.5} strokeLinecap="round" opacity={0.65} />
+          </g>
         )}
-        {/* 左臂 */}
-        <rect
-          className="lqs-arm-l"
-          x={-headR * 1.05}
-          y={headR * 2 + 0.5}
-          width={1.6}
-          height={figureH * 0.32}
-          rx={0.8}
-          fill={a.outfitStroke}
-        />
-        {/* 右臂 */}
-        <rect
-          className="lqs-arm-r"
-          x={headR * 0.85 - 0.2}
-          y={headR * 2 + 0.5}
-          width={1.6}
-          height={figureH * 0.32}
-          rx={0.8}
-          fill={a.outfitStroke}
-        />
-        {/* 左腿 */}
-        <rect
-          className="lqs-leg-l"
-          x={-headR * 0.55}
-          y={headR * 2 + figureH * 0.42}
-          width={1.8}
-          height={figureH * 0.34}
-          rx={0.8}
-          fill="#0f172a"
-        />
-        {/* 右腿 */}
-        <rect
-          className="lqs-leg-r"
-          x={headR * 0.05}
-          y={headR * 2 + figureH * 0.42}
-          width={1.8}
-          height={figureH * 0.34}
-          rx={0.8}
-          fill="#0f172a"
-        />
+
+        {a.hairStyle === 'pony-twin' && (
+          <g>
+            <ellipse className="lqs-pony-l" cx={-headR * 1.05} cy={headR * 1.15} rx={1.2} ry={2.1} fill={a.hairFill} />
+            <ellipse className="lqs-pony-r" cx={ headR * 1.05} cy={headR * 1.15} rx={1.2} ry={2.1} fill={a.hairFill} />
+          </g>
+        )}
       </g>
     </svg>
   )
@@ -293,18 +463,33 @@ function CharacterFigure({ a }: { a: CharacterAppearance }) {
 
 function CharacterStage({ stageId, age, stageName, regionName, familyName }: { stageId: string; age: number; stageName: string; regionName: string; familyName: string }) {
   const a = appearanceForStageId(stageId)
+  // 姿态补助 class: stooped 高龄、bouncy 童年。 leaning-fwd / upright 不额外加 class.
+  const poseClass =
+    a.posture === 'stooped' ? 'lqs-pose-stooped' :
+    a.posture === 'bouncy'  ? 'lqs-pose-bouncy'  : ''
+  // CSS 变量控制走路速度 / 步频 / 弹跳幅度 - 童年快且跳、高龄慢且低.
+  const stageStyle = {
+    ['--lqs-walk-speed' as any]: `${a.walkSpeedSec}s`,
+    ['--lqs-bob-speed' as any]: `${a.bobSpeedSec}s`,
+    ['--lqs-bob-amp' as any]: `${a.bobAmpPx}px`,
+  } as React.CSSProperties
+  // gradId 以 stageId 为名空间, 避免同页多个 SVG 的 <defs> id 冲突 (如 future a/b stage compare).
+  const gradId = `lqs-grad-${stageId}`
   return (
     <div
-      className="lqs-character-stage"
+      className={`lqs-character-stage lqs-stage-transition ${poseClass}`}
       role="img"
       aria-label={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人走动动画: ${a.caption}`}
+      key={stageId}
+      style={stageStyle}
     >
       <div className="lqs-character-caption">{age} 岁 · {stageName} · {a.caption}</div>
       <div className="lqs-character-ground" />
       <div className="lqs-character-walker">
+        <div className="lqs-character-shadow" />
         <div className="lqs-character-bob">
           <div className="lqs-character" style={{ width: '100%' }}>
-            <CharacterFigure a={a} />
+            <CharacterFigure a={a} gradId={gradId} />
           </div>
         </div>
       </div>
