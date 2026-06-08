@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type LifeStage = {
   id: string
@@ -1040,7 +1040,109 @@ export default function SimPage() {
   // 当前状态卡：资产 / 身份 / 学历 / 身体机能。
   // 仅以 (age, region, family) 派生出“趋势”字符，不是真实模拟输出，用于 demo 中红/绿涨跌可视化。
   type StatTrend = 'up' | 'down' | 'flat'
-  type StatusCard = { key: string; label: string; value: string; trend: StatTrend; hint: string }
+  type StatusCard = {
+    key: string
+    label: string
+    value: string
+    trend: StatTrend
+    hint: string
+    // 数值变化指标（与上一时间步比较，按各维度合理量纲显示）。
+    score: number // 当前分值
+    delta: number // 与上一时间步差值（带符号）
+    unit: string // 单位 / 量纲标签，例如 '万' / '分' / '%'。
+    deltaPrecision: number // 差值显示小数位数。
+  }
+
+  // —— 每个维度的连续分值（与 (age, regionId, familyId) 单向派生）——
+  // 用连续数值，而不是离散字符串，便于做差值与红/绿可视化。
+  // 量纲选择：
+  //   资产 wealth: 万（家庭资本 + 主动积累曲线，0~约 1500）
+  //   身份 identity: 分（地域基础分 + 年龄阶段红利，0~100）
+  //   学历 education: 分（受教育年限 + 上限封顶，0~100）
+  //   身体 body: 分（婴幼儿爬升 → 25 岁前后峰值 → 老年衰退，0~100）
+  const wealthScore = (() => {
+    const familyBase =
+      familyId === 'wealthy' ? 500
+        : familyId === 'middle' ? 120
+        : familyId === 'working' ? 30
+        : 8
+    // 主动积累期：22-55 岁线性上升；55-70 平台；70+ 缓慢消耗。
+    let active = 0
+    if (age >= 22 && age < 55) active = (age - 22) * 18
+    else if (age >= 55 && age < 70) active = (55 - 22) * 18
+    else if (age >= 70) active = (55 - 22) * 18 - (age - 70) * 6
+    // 出身家庭对“主动积累斜率”的轻微加成。
+    const slopeBonus = familyId === 'wealthy' ? active * 0.4
+      : familyId === 'middle' ? active * 0.15
+      : 0
+    return Math.max(0, Math.round(familyBase + active + slopeBonus))
+  })()
+
+  const identityScore = (() => {
+    const regionBase =
+      regionId === 'overseas' ? 70
+        : regionId === 'tier1' ? 85
+        : regionId === 'tier2' ? 65
+        : regionId === 'tier34' ? 45
+        : regionId === 'county' ? 30
+        : 18
+    // 年龄阶段红利：在校 < 应届 < 在职 < 中坚；老年回落。
+    const stageBonus =
+      age < 7 ? 0
+        : age < 19 ? 3
+        : age < 23 ? 8
+        : age < 35 ? 12
+        : age < 60 ? 14
+        : age < 75 ? 6
+        : 0
+    return Math.max(0, Math.min(100, regionBase + stageBonus - (age >= 60 ? (age - 60) * 0.3 : 0)))
+  })()
+
+  const educationScore = (() => {
+    // 简化的“受教育投入分”累计曲线，到 25 岁前后封顶。
+    let s = 0
+    if (age >= 0) s = Math.min(8, age) * 1 // 0-7: 学前/识字
+    if (age >= 7) s += Math.min(6, age - 7) * 3 // 7-12: 小学
+    if (age >= 13) s += Math.min(3, age - 12) * 5 // 13-15: 初中
+    if (age >= 16) s += Math.min(3, age - 15) * 6 // 16-18: 高中
+    if (age >= 19) s += Math.min(4, age - 18) * 7 // 19-22: 本科
+    if (age >= 23) s += Math.min(3, age - 22) * 4 // 23-25: 硕士 / 早期工作沉淀
+    if (age >= 26) s += Math.min(60, age - 25) * 0.05 // 持续学习的边际加成（很小）
+    // 老年期：学历折旧（行业更迭，含金量逐年下降）。
+    if (age >= 60) s -= (age - 60) * 0.2
+    return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+  })()
+
+  const bodyScore = (() => {
+    // 0-25 爬升至 100，25-30 维持，30-50 缓降，50+ 加速下降。
+    let s = 0
+    if (age <= 25) s = (age / 25) * 100
+    else if (age <= 30) s = 100
+    else if (age <= 50) s = 100 - (age - 30) * 1.0
+    else if (age <= 70) s = 80 - (age - 50) * 1.8
+    else s = 80 - 20 * 1.8 - (age - 70) * 2.4
+    return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+  })()
+
+  // 缓存上一时间步分值，用于计算 delta。初次渲染 delta = 0 / trend = 'flat'。
+  const prevScoresRef = useRef<{ wealth: number; identity: number; education: number; body: number } | null>(null)
+  const prev = prevScoresRef.current
+  const dWealth = prev ? Math.round((wealthScore - prev.wealth) * 10) / 10 : 0
+  const dIdentity = prev ? Math.round((identityScore - prev.identity) * 10) / 10 : 0
+  const dEducation = prev ? Math.round((educationScore - prev.education) * 10) / 10 : 0
+  const dBody = prev ? Math.round((bodyScore - prev.body) * 10) / 10 : 0
+  // 在渲染完成后把当前分值落到 ref，下一次比较用。
+  useEffect(() => {
+    prevScoresRef.current = {
+      wealth: wealthScore,
+      identity: identityScore,
+      education: educationScore,
+      body: bodyScore,
+    }
+  }, [wealthScore, identityScore, educationScore, bodyScore])
+
+  const trendOf = (d: number): StatTrend => (d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'flat')
+
   const statusCards: StatusCard[] = useMemo(() => {
     // 学历趋势：18-25 上升，25-45 趋于平稳，老年期轻微贬值。
     const educationStage =
@@ -1059,7 +1161,7 @@ export default function SimPage() {
         : age < 60
         ? '在职定型'
         : '退休后、经验依据'
-    const educationTrend: StatTrend = age < 25 ? 'up' : age < 60 ? 'flat' : 'down'
+    const educationTrend: StatTrend = trendOf(dEducation)
 
     // 资产趋势：与出身家庭与年龄双向相关。同一家庭起点，青年-中年为上升期，高龄为衰退期。
     const wealthBaseline =
@@ -1070,8 +1172,7 @@ export default function SimPage() {
         : familyId === 'working'
         ? '起点偏低 / 主要靠工资'
         : '起点低 / 代际可调动资金有限'
-    const wealthTrend: StatTrend =
-      age < 22 ? 'flat' : age < 55 ? 'up' : age < 70 ? 'flat' : 'down'
+    const wealthTrend: StatTrend = trendOf(dWealth)
 
     // 身体机能：18-30 峰值，30-50 平原 + 轻下，50+ 加速下降。
     const bodyStage =
@@ -1086,7 +1187,7 @@ export default function SimPage() {
         : age < 80
         ? '衰退期'
         : '依赖照护'
-    const bodyTrend: StatTrend = age < 25 ? 'up' : age < 40 ? 'flat' : 'down'
+    const bodyTrend: StatTrend = trendOf(dBody)
 
     // 身份：与出身地域 + 年龄阶段拼接。
     const identityRole =
@@ -1113,7 +1214,7 @@ export default function SimPage() {
         : regionId === 'county'
         ? '县城身份 / 依赖熟人网络'
         : '农村身份 / 跨阶层需要离开'
-    const identityTrend: StatTrend = age < 35 ? 'up' : age < 60 ? 'flat' : 'down'
+    const identityTrend: StatTrend = trendOf(dIdentity)
 
     return [
       {
@@ -1121,6 +1222,10 @@ export default function SimPage() {
         label: '资产',
         value: wealthBaseline,
         trend: wealthTrend,
+        score: wealthScore,
+        delta: dWealth,
+        unit: '万',
+        deltaPrecision: 1,
         hint:
           age < 22
             ? '仍主要以家庭资本为主，未进入主动积累阶段。'
@@ -1135,6 +1240,10 @@ export default function SimPage() {
         label: '身份',
         value: identityRole,
         trend: identityTrend,
+        score: identityScore,
+        delta: dIdentity,
+        unit: '分',
+        deltaPrecision: 1,
         hint: identityHint,
       },
       {
@@ -1142,6 +1251,10 @@ export default function SimPage() {
         label: '学历',
         value: educationStage,
         trend: educationTrend,
+        score: educationScore,
+        delta: dEducation,
+        unit: '分',
+        deltaPrecision: 1,
         hint:
           age < 23
             ? '学历资本净增期；应届身份仅能使用一次。'
@@ -1154,6 +1267,10 @@ export default function SimPage() {
         label: '身体机能',
         value: bodyStage,
         trend: bodyTrend,
+        score: bodyScore,
+        delta: dBody,
+        unit: '分',
+        deltaPrecision: 1,
         hint:
           age < 30
             ? '体能 / 反应 / 恢复均处于峰值期。'
@@ -1162,7 +1279,7 @@ export default function SimPage() {
             : '慢病管理期；医疗与生活质量成本上升。',
       },
     ]
-  }, [age, familyId, regionId])
+  }, [age, familyId, regionId, wealthScore, identityScore, educationScore, bodyScore, dWealth, dIdentity, dEducation, dBody])
 
   // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
   // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
@@ -1363,6 +1480,10 @@ export default function SimPage() {
               const color = isUp ? '#047857' : isDown ? '#b91c1c' : '#6b7280'
               const bg = isUp ? '#ecfdf5' : isDown ? '#fef2f2' : '#f9fafb'
               const border = isUp ? '#10b981' : isDown ? '#f87171' : '#d1d5db'
+              // 数值变化展示：与上一时间步比较的 delta，带符号 + 单位。
+              const sign = c.delta > 0 ? '+' : c.delta < 0 ? '−' : '±'
+              const absDelta = Math.abs(c.delta).toFixed(c.deltaPrecision)
+              const deltaText = `${sign}${absDelta} ${c.unit}`
               return (
                 <div
                   key={c.key}
@@ -1381,14 +1502,25 @@ export default function SimPage() {
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, color: '#6b7280' }}>{c.label}</span>
                     <span
-                      aria-label={c.trend === 'up' ? '上涨' : c.trend === 'down' ? '下跌' : '持平'}
-                      style={{ color, fontWeight: 700, fontSize: 13 }}
+                      className="lqs-status-delta"
+                      aria-label={`${c.trend === 'up' ? '上涨' : c.trend === 'down' ? '下跌' : '持平'} ${deltaText}`}
+                      style={{ color, fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
-                      {arrow}
+                      <span style={{ fontSize: 13 }}>{arrow}</span>
+                      <span>{deltaText}</span>
                     </span>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{c.value}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{c.hint}</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+                    <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5, flex: 1 }}>{c.hint}</div>
+                    <div
+                      title={`当前指标值: ${c.score} ${c.unit}（与上一时间步比较 ${deltaText}）`}
+                      style={{ fontSize: 11, color: '#374151', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                    >
+                      {c.score}
+                      <span style={{ color: '#9ca3af', marginLeft: 2 }}>{c.unit}</span>
+                    </div>
+                  </div>
                 </div>
               )
             })}

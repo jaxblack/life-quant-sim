@@ -173,6 +173,11 @@ video {
   max-width: 100%;
   min-width: 0;
 }
+/* 趋势指标数值（与上一时间步 delta）：紧贴箭头，等宽数字。 */
+.lqs-status-delta {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 @media (max-width: 640px) {
   .lqs-status-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
