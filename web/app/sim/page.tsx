@@ -1398,7 +1398,10 @@ export default function SimPage() {
   }, [age, selectedTalents, showMissed, trackTab])
 
   return (
-    <section style={{ display: 'grid', gap: 16 }}>
+    // lqs-sim-page: 标记 /sim 页根节点, 配合 globals.css 中
+    // @media(min-width:1100px) .lqs-main:has(.lqs-sim-page) 让 /sim
+    // 在 PC 上撑满 viewport, 不影响 / 首页 (layout.tsx 仍是 maxWidth:960).
+    <section className="lqs-sim-page" style={{ display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 6 }}>
         <h1 className="lqs-sim-title" style={{ fontSize: 32, margin: 0 }}>人生模拟 Demo</h1>
         <p className="lqs-sim-lede" style={{ color: '#6b7280', margin: 0, lineHeight: 1.7 }}>

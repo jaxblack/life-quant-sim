@@ -560,3 +560,23 @@ video {
     font-size: 13px;
   }
 }
+
+/* ----------------------- /sim PC 全宽布局 (≥1100px) ----------------------- */
+/* layout.tsx 给 .lqs-main 固定了 maxWidth:960，全站通用；                       */
+/* 在 PC（≥1100px）下，仅对 /sim 路径用 :has(.lqs-sim-page) 选择器把外层 main      */
+/* 放开成全宽（左右各 28px padding），让 .lqs-sim-grid 真正撑满 viewport。       */
+/* 首页 / 的 <main> 不含 .lqs-sim-page，不会被影响。                            */
+/* 小屏（<1100px）此规则不生效，原响应式断点（≤640px / ≤360px）保留。          */
+@media (min-width: 1100px) {
+  .lqs-main:has(.lqs-sim-page) {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 32px 28px !important;
+  }
+  /* /sim 主网格本身也放开任何隐式 max-width，由父级 main 决定可用宽度。 */
+  .lqs-sim-page .lqs-sim-grid {
+    max-width: none;
+    width: 100%;
+  }
+}
