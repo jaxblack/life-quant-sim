@@ -199,6 +199,11 @@ video {
   .lqs-character svg .lqs-arm-r,
   .lqs-character svg .lqs-leg-l,
   .lqs-character svg .lqs-leg-r,
+  .lqs-character svg .lqs-arm-l-fore,
+  .lqs-character svg .lqs-arm-r-fore,
+  .lqs-character svg .lqs-leg-l-shin,
+  .lqs-character svg .lqs-leg-r-shin,
+  .lqs-character svg .lqs-head-nod,
   .lqs-character svg .lqs-eyelid-l,
   .lqs-character svg .lqs-eyelid-r,
   .lqs-character svg .lqs-torso-breath,
@@ -237,14 +242,18 @@ video {
   50%      { transform: translateY(0); }
   75%      { transform: translateY(calc(var(--lqs-bob-amp, 2px) * -1)); }
 }
-/* 四肢摆动: 用 cubic-bezier 让起止收得更利落, 像真实步态. */
+/* 四肢摆动: 加进 25/75 中间帧, 摆动过程不是纯线性, 更贴近真实步态. */
 @keyframes lqs-swing-fwd {
-  0%, 100% { transform: rotate(-26deg); }
-  50%      { transform: rotate(26deg); }
+  0%, 100% { transform: rotate(-30deg); }
+  25%      { transform: rotate(-8deg); }
+  50%      { transform: rotate(30deg); }
+  75%      { transform: rotate(8deg); }
 }
 @keyframes lqs-swing-bwd {
-  0%, 100% { transform: rotate(26deg); }
-  50%      { transform: rotate(-26deg); }
+  0%, 100% { transform: rotate(30deg); }
+  25%      { transform: rotate(8deg); }
+  50%      { transform: rotate(-30deg); }
+  75%      { transform: rotate(-8deg); }
 }
 /* 老年/驼背: 摆动幅度更小. */
 @keyframes lqs-swing-fwd-soft {
@@ -286,6 +295,24 @@ video {
 @keyframes lqs-cane-tap {
   0%, 100% { transform: rotate(-2deg) translateY(0); }
   50%      { transform: rotate(2deg) translateY(0.5px); }
+}
+/* 膝/胘 屈伸: 走路中间帧. 使三段腿不是合独刚性摆动, 而是调足期屈膌. */
+@keyframes lqs-knee-bend {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(14deg); }   /* 调足期, 脚后抹 */
+  50%      { transform: rotate(0deg); }
+  75%      { transform: rotate(-4deg); }   /* 支撑期, 微超伸 */
+}
+@keyframes lqs-elbow-bend {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-10deg); }
+  50%      { transform: rotate(0deg); }
+  75%      { transform: rotate(10deg); }
+}
+/* 头部跟随 bob 微点, 幅度极小只加生动. */
+@keyframes lqs-head-nod {
+  0%, 100% { transform: rotate(-1deg) translateY(0); }
+  50%      { transform: rotate(1deg) translateY(0.4px); }
 }
 
 /* ---- 舞台容器 ---- */
@@ -375,19 +402,34 @@ video {
 }
 
 /* 四肢摆动. */
+/* 上臂 + 大腿 (主摆动 swing): 躯干根节点, transform-origin 由 SVG inline style 指定到肩/胯关节坐标. */
 .lqs-character svg .lqs-arm-l,
 .lqs-character svg .lqs-leg-r {
-  transform-box: fill-box;
-  transform-origin: top center;
   animation: lqs-swing-fwd var(--lqs-bob-speed) cubic-bezier(0.55, 0, 0.45, 1) infinite;
 }
 .lqs-character svg .lqs-arm-r,
 .lqs-character svg .lqs-leg-l {
-  transform-box: fill-box;
-  transform-origin: top center;
   animation: lqs-swing-bwd var(--lqs-bob-speed) cubic-bezier(0.55, 0, 0.45, 1) infinite;
 }
-
+/* 前臂 + 小腿 (屈伸): 胘 / 膝 点为轴, transform-origin 同样由 inline style 指定. */
+/* 臂: 前臂随摆动同期屈伸, 脚: 小腿在调足期屈膌. */
+.lqs-character svg .lqs-leg-r-shin,
+.lqs-character svg .lqs-leg-l-shin {
+  animation: lqs-knee-bend var(--lqs-bob-speed) cubic-bezier(0.4, 0, 0.4, 1) infinite;
+}
+.lqs-character svg .lqs-leg-l-shin {
+  animation-delay: calc(var(--lqs-bob-speed) * -0.5);
+}
+.lqs-character svg .lqs-arm-r-fore,
+.lqs-character svg .lqs-arm-l-fore {
+  animation: lqs-elbow-bend var(--lqs-bob-speed) ease-in-out infinite;
+}
+.lqs-character svg .lqs-arm-l-fore {
+  animation-delay: calc(var(--lqs-bob-speed) * -0.5);
+}
+.lqs-character svg .lqs-head-nod {
+  animation: lqs-head-nod var(--lqs-bob-speed) ease-in-out infinite;
+}
 /* 老年/驼背版本: 摆动幅度更小 (容器加 .lqs-pose-stooped 类). */
 .lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-arm-l,
 .lqs-character-stage.lqs-pose-stooped .lqs-character svg .lqs-leg-r {

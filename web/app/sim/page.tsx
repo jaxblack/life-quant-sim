@@ -314,10 +314,23 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
   const legH = figureH * 0.34
   const limbW = 1.8
   const armH = torsoH * 0.92
+  // 分段: 上臂/前臂 与 大腿/小腿 各取总长的 50% / 50%.
+  const upperArmH = armH * 0.52
+  const foreArmH = armH * 0.50
+  const thighH = legH * 0.52
+  const shinH = legH * 0.50
+  // 肩关节 / 胯关节 几何点 (用于 CSS transform-origin 与叠节 svg).
+  const shoulderY = torsoTop + 0.6
+  const hipY = legTop
 
   const outfitGrad = `${gradId}-outfit`
   const hairGrad = `${gradId}-hair`
   const skinGrad = `${gradId}-skin`
+  const legGrad = `${gradId}-leg`
+  const armGrad = `${gradId}-arm`
+
+  // 领口暗色块: 本色 outfitFillDark, 中间三角/梯形 V 领.
+  const collarColor = a.outfitFillDark
 
   const groupRotate =
     a.posture === 'leaning-fwd' ? -2 :
@@ -331,7 +344,8 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
       <defs>
         <linearGradient id={outfitGrad} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={a.outfitFillLight} />
-          <stop offset="55%" stopColor={a.outfitFillLight} />
+          <stop offset="35%" stopColor={a.outfitFillLight} />
+          <stop offset="70%" stopColor={a.outfitFill} />
           <stop offset="100%" stopColor={a.outfitFillDark} />
         </linearGradient>
         <linearGradient id={hairGrad} x1="0" y1="0" x2="0" y2="1">
@@ -343,11 +357,39 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
           <stop offset="0%" stopColor={a.skinFill} />
           <stop offset="100%" stopColor={a.skinShade} />
         </linearGradient>
+        {/* 裤腿 / 袖管 供体积感的横向渐变 (受光面 → 暗面). */}
+        <linearGradient id={legGrad} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={a.legFill} stopOpacity="1" />
+          <stop offset="45%" stopColor="rgba(255,255,255,0.18)" />
+          <stop offset="100%" stopColor={a.legFill} stopOpacity="1" />
+        </linearGradient>
+        <linearGradient id={armGrad} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={a.outfitStroke} />
+          <stop offset="45%" stopColor="rgba(255,255,255,0.16)" />
+          <stop offset="100%" stopColor={a.outfitStroke} />
+        </linearGradient>
       </defs>
 
       <g transform={`translate(${baseW / 2}, ${baseH - figureH}) rotate(${groupRotate})`}>
-        <rect className="lqs-leg-r" x={headR * 0.05} y={legTop} width={limbW} height={legH} rx={0.9} fill={a.legFill} />
-        <rect className="lqs-arm-r" x={headR * 0.85 - 0.2} y={torsoTop + 0.6} width={limbW * 0.95} height={armH} rx={0.9} fill={a.outfitStroke} />
+        {/* 右腿 (后腿, 分 大腿 + 小腿). 大腿绕胯摆动，小腿绕膝伸屈. */}
+        <g className="lqs-leg-r" style={{ transformOrigin: `${headR * 0.05 + limbW / 2}px ${hipY}px` }}>
+          <rect x={headR * 0.05} y={hipY} width={limbW} height={thighH} rx={0.9} fill={`url(#${legGrad})`} />
+          <g className="lqs-leg-r-shin" style={{ transformOrigin: `${headR * 0.05 + limbW / 2}px ${hipY + thighH}px` }}>
+            <rect x={headR * 0.05} y={hipY + thighH} width={limbW} height={shinH} rx={0.9} fill={`url(#${legGrad})`} />
+            {/* 右鞋 */}
+            <rect x={headR * 0.05 - 0.6} y={hipY + thighH + shinH - 0.2} width={limbW + 1.2} height={1.5} rx={0.8} fill="#0f172a" />
+            <rect x={headR * 0.05 - 0.4} y={hipY + thighH + shinH - 0.2} width={limbW + 0.4} height={0.4} rx={0.2} fill="rgba(255,255,255,0.22)" />
+          </g>
+        </g>
+        {/* 右臂 (后臂, 分 上臂 + 前臂). */}
+        <g className="lqs-arm-r" style={{ transformOrigin: `${headR * 0.85 - 0.2 + limbW * 0.475}px ${shoulderY}px` }}>
+          <rect x={headR * 0.85 - 0.2} y={shoulderY} width={limbW * 0.95} height={upperArmH} rx={0.9} fill={`url(#${armGrad})`} />
+          <g className="lqs-arm-r-fore" style={{ transformOrigin: `${headR * 0.85 - 0.2 + limbW * 0.475}px ${shoulderY + upperArmH}px` }}>
+            <rect x={headR * 0.85 - 0.2} y={shoulderY + upperArmH} width={limbW * 0.95} height={foreArmH} rx={0.9} fill={`url(#${armGrad})`} />
+            {/* 右手 */}
+            <circle cx={headR * 0.85 - 0.2 + limbW * 0.475} cy={shoulderY + upperArmH + foreArmH + 0.4} r={0.95} fill={`url(#${skinGrad})`} stroke={a.skinShade} strokeWidth={0.2} />
+          </g>
+        </g>
 
         <g className="lqs-torso-breath">
           <path
@@ -360,7 +402,16 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
             stroke={a.outfitStroke}
             strokeWidth={0.6}
           />
+          {/* 领口 V 领暗色块: 躯干顶部中央三角, 逾近领口看起来有衣服层次. */}
+          <path
+            d={`M ${-headR * 0.62} ${torsoTop} L ${headR * 0.62} ${torsoTop} L 0 ${torsoTop + torsoH * 0.28} z`}
+            fill={collarColor}
+            opacity={0.85}
+          />
+          {/* 躯干高光带: 中轴受光. */}
           <line x1={0} y1={torsoTop + 1} x2={0} y2={torsoTop + torsoH - 1} stroke="rgba(255,255,255,0.35)" strokeWidth={0.5} />
+          {/* 侧后暗面: 零件边缘暗色带加体积感. */}
+          <line x1={headR * 0.78} y1={torsoTop + 1} x2={headR * 0.62} y2={torsoTop + torsoH - 1} stroke={collarColor} strokeWidth={0.5} opacity={0.55} />
           {(a.accessory === 'tie' || a.accessory === 'briefcase') && (
             <path
               d={`M -0.9 ${torsoTop + 0.3} L 0.9 ${torsoTop + 0.3} L 0 ${torsoTop + torsoH * 0.45} z`}
@@ -374,11 +425,24 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
           )}
         </g>
 
-        <rect className="lqs-leg-l" x={-headR * 0.55} y={legTop} width={limbW} height={legH} rx={0.9} fill={a.legFill} />
-        <ellipse cx={-headR * 0.55 + limbW / 2} cy={legTop + legH + 0.6} rx={1.6} ry={0.7} fill="#0f172a" />
-        <ellipse cx={ headR * 0.05 + limbW / 2} cy={legTop + legH + 0.6} rx={1.6} ry={0.7} fill="#0f172a" />
+        {/* 左腿 (前腿). */}
+        <g className="lqs-leg-l" style={{ transformOrigin: `${-headR * 0.55 + limbW / 2}px ${hipY}px` }}>
+          <rect x={-headR * 0.55} y={hipY} width={limbW} height={thighH} rx={0.9} fill={`url(#${legGrad})`} />
+          <g className="lqs-leg-l-shin" style={{ transformOrigin: `${-headR * 0.55 + limbW / 2}px ${hipY + thighH}px` }}>
+            <rect x={-headR * 0.55} y={hipY + thighH} width={limbW} height={shinH} rx={0.9} fill={`url(#${legGrad})`} />
+            <rect x={-headR * 0.55 - 0.6} y={hipY + thighH + shinH - 0.2} width={limbW + 1.2} height={1.5} rx={0.8} fill="#0f172a" />
+            <rect x={-headR * 0.55 - 0.4} y={hipY + thighH + shinH - 0.2} width={limbW + 0.4} height={0.4} rx={0.2} fill="rgba(255,255,255,0.22)" />
+          </g>
+        </g>
 
-        <rect className="lqs-arm-l" x={-headR * 1.05} y={torsoTop + 0.6} width={limbW * 0.95} height={armH} rx={0.9} fill={a.outfitStroke} />
+        {/* 左臂 (前臂). */}
+        <g className="lqs-arm-l" style={{ transformOrigin: `${-headR * 1.05 + limbW * 0.475}px ${shoulderY}px` }}>
+          <rect x={-headR * 1.05} y={shoulderY} width={limbW * 0.95} height={upperArmH} rx={0.9} fill={`url(#${armGrad})`} />
+          <g className="lqs-arm-l-fore" style={{ transformOrigin: `${-headR * 1.05 + limbW * 0.475}px ${shoulderY + upperArmH}px` }}>
+            <rect x={-headR * 1.05} y={shoulderY + upperArmH} width={limbW * 0.95} height={foreArmH} rx={0.9} fill={`url(#${armGrad})`} />
+            <circle cx={-headR * 1.05 + limbW * 0.475} cy={shoulderY + upperArmH + foreArmH + 0.4} r={0.95} fill={`url(#${skinGrad})`} stroke={a.skinShade} strokeWidth={0.2} />
+          </g>
+        </g>
 
         {a.accessory === 'briefcase' && (
           <g>
@@ -406,6 +470,7 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
           />
         )}
 
+        <g className="lqs-head-nod" style={{ transformOrigin: `0px ${headR * 1.85}px` }}>
         <rect x={-headR * 0.35} y={headR * 1.85} width={headR * 0.7} height={headR * 0.4} fill={`url(#${skinGrad})`} />
         <circle cx={0} cy={headR} r={headR} fill={`url(#${skinGrad})`} stroke={a.skinShade} strokeWidth={0.4} />
         <ellipse cx={-headR * 0.55} cy={headR * 1.25} rx={1.1} ry={0.6} fill="rgba(244,114,182,0.45)" />
@@ -456,6 +521,7 @@ function CharacterFigure({ a, gradId }: { a: CharacterAppearance; gradId: string
             <ellipse className="lqs-pony-r" cx={ headR * 1.05} cy={headR * 1.15} rx={1.2} ry={2.1} fill={a.hairFill} />
           </g>
         )}
+        </g>
       </g>
     </svg>
   )
