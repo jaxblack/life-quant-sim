@@ -1350,6 +1350,9 @@ export default function SimPage() {
   // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
   // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
   const FUTURE_HORIZON_YEARS = 10
+  // 刚刚错过的人生窗口：默认在主列表底部列出过去 5 年内刚关闭的窗口，
+  // 错过太久的超过该阈值则默认隐藏；showMissed=true 时才加载 5 年外的全量回顾。
+  const MISSED_LOOKBACK_YEARS = 5
   const visibleWindows = useMemo(() => {
     const byTalent = OPPORTUNITY_WINDOWS.filter((w) =>
       w.talents.some((t) => selectedTalents.includes(t))
@@ -1358,9 +1361,15 @@ export default function SimPage() {
     const byTrack = byTalent.filter(
       (w) => w.track === trackTab || w.track === 'both'
     )
-    const withMissed = showMissed
-      ? byTrack
-      : byTrack.filter((w) => classifyWindow(age, w) !== 'missed')
+    // missed 窗口过滤规则：
+    //  - showMissed = false (默认): 仅保留 age - ageEnd <= MISSED_LOOKBACK_YEARS 的“刚错过”窗口；
+    //  - showMissed = true: 加载全部 missed (含 5 年外的远期回顾)。
+    const withMissed = byTrack.filter((w) => {
+      const status = classifyWindow(age, w)
+      if (status !== 'missed') return true
+      if (showMissed) return true
+      return age - w.ageEnd <= MISSED_LOOKBACK_YEARS
+    })
     // 未来10年过滤：upcoming 状态的窗口若起点超过 age + 10，则不以"即将到来"展示。
     // current / closing 已在窗口内（或将在 ≤3 年内结束），天然落在 10 年内，无需额外过滤。
     const withinHorizon = withMissed.filter((w) => {
@@ -1380,6 +1389,10 @@ export default function SimPage() {
       const sa = order[classifyWindow(age, a)]
       const sb = order[classifyWindow(age, b)]
       if (sa !== sb) return sa - sb
+      // missed 中同类按“错过越近越靠前”：age - ageEnd 升序（其他状态仍按 ageStart）。
+      if (classifyWindow(age, a) === 'missed') {
+        return (age - a.ageEnd) - (age - b.ageEnd)
+      }
       return a.ageStart - b.ageStart
     })
   }, [age, selectedTalents, showMissed, trackTab])
@@ -1830,8 +1843,8 @@ export default function SimPage() {
                 <span style={{ color: '#b91c1c', fontWeight: 600 }}> 即将错过</span>、
                 <span style={{ color: '#047857' }}> 当前可选</span>、
                 <span style={{ color: '#1d4ed8' }}> 即将到来</span>、
-                <span style={{ color: '#6b7280' }}> 已关闭</span>。
-                "即将到来"仅展示<strong>未来10年</strong>内可触达的窗口；更远的窗口不在当前关注列表。"已关闭"窗口默认隐藏，可在筛选区切换查看长期机会成本回顾。
+                <span style={{ color: '#6b7280' }}> 刚刚错过</span>。
+                "即将到来"仅展示<strong>未来10年</strong>内可触达的窗口；更远的窗口不在当前关注列表。“刚刚错过”仅列出过去<strong>5 年</strong>内刚关闭的窗口，错过太久的默认隐藏；可在筛选区切换“显示全部已错过”查看长期机会成本回顾。
               </p>
             </div>
 
@@ -1947,7 +1960,7 @@ export default function SimPage() {
                   checked={showMissed}
                   onChange={(e) => setShowMissed(e.target.checked)}
                 />
-                显示已关闭窗口
+                显示全部已错过（含 5 年外）
               </label>
             </div>
 
@@ -1967,6 +1980,9 @@ export default function SimPage() {
               )}
               {visibleWindows.map((win) => {
                 const status = classifyWindow(age, win)
+                // 刚错过（阈值内）vs 错过太久：在 missed 详情里区分。
+                const missedYears = status === 'missed' ? age - win.ageEnd : 0
+                const isRecentlyMissed = status === 'missed' && missedYears <= MISSED_LOOKBACK_YEARS
                 const palette =
                   status === 'closing'
                     ? { border: '#f87171', bg: '#fef2f2', tag: '#b91c1c', label: '即将错过' }
@@ -1974,7 +1990,9 @@ export default function SimPage() {
                     ? { border: '#10b981', bg: '#ecfdf5', tag: '#047857', label: '当前可选' }
                     : status === 'upcoming'
                     ? { border: '#93c5fd', bg: '#eff6ff', tag: '#1d4ed8', label: '即将到来' }
-                    : { border: '#d1d5db', bg: '#f9fafb', tag: '#6b7280', label: '已关闭' }
+                    : isRecentlyMissed
+                    ? { border: '#9ca3af', bg: '#f3f4f6', tag: '#4b5563', label: `刚错过 ${missedYears} 年` }
+                    : { border: '#d1d5db', bg: '#f9fafb', tag: '#6b7280', label: '已错过很久' }
                 const talentNames = win.talents
                   .map((t) => TALENTS.find((x) => x.id === t)?.name)
                   .filter(Boolean)
@@ -1982,13 +2000,15 @@ export default function SimPage() {
                 return (
                   <li
                     key={win.id}
+                    aria-disabled={status === 'missed' ? 'true' : undefined}
                     style={{
-                      border: `1px solid ${palette.border}`,
+                      border: `1px ${status === 'missed' ? 'dashed' : 'solid'} ${palette.border}`,
                       background: palette.bg,
                       borderRadius: 10,
                       padding: 12,
                       display: 'grid',
                       gap: 8,
+                      opacity: status === 'missed' ? 0.65 : 1,
                     }}
                   >
                     <div
