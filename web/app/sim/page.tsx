@@ -1023,6 +1023,128 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     longTermLoss:
       '错过这扇门：护照升级与投资身份项目资金门槛随全球政策随年上调，中文跨境资产配置与子女教育路径的可选项同步收窄。',
   },
+  // —— 中老年事业 / 资产 / 影响力 / 精神归宿 / 婚恋重组窗口（45-85） ——
+  {
+    id: 'family_trust_setup',
+    title: '家族信托 / 财富结构搭建窗口',
+    ageStart: 45,
+    ageEnd: 65,
+    talents: ['business'],
+    track: 'career',
+    branches: ['境内家族信托 + 保险金信托', '离岸家族信托（开曼 / 新加坡）', '保险 + 控股公司组合', '裸资产 + 遗嘱兜底'],
+    longTermLoss:
+      '错过这扇门：信托设立前的可处置资产结构、婚姻状态、税务居民身份一旦改变（重病 / 离婚 / 移居），多数信托工具的隔离效力会被认定无效；55 岁后再补，律师 / 税务 / 跨境合规成本指数上升，传承确定性显著下降。',
+  },
+  {
+    id: 'offshore_asset_allocation',
+    title: '海外资产配置 / 全球分散窗口',
+    ageStart: 50,
+    ageEnd: 70,
+    talents: ['business', 'academic'],
+    track: 'career',
+    branches: ['美 / 港 / 新券商账户分散', '海外不动产 + 长租收益', '美元保单 + 全球基金', '完全 onshore 单币种'],
+    longTermLoss:
+      '错过这扇门：跨境开户的身份认证、资金合规出境、税务申报体系学习曲线在 60+ 明显陡峭；CRS / FATCA 与各国遗产税的叠加在中老年期才补做，多半要走赠与 / 转让的折价路径，资产币种与司法管辖单一化是难以回头的结构性风险。',
+  },
+  {
+    id: 'wealth_inheritance',
+    title: '财富传承 / 遗嘱与跨代结构窗口',
+    ageStart: 55,
+    ageEnd: 78,
+    talents: ['business', 'discipline'],
+    track: 'career',
+    branches: ['公证遗嘱 + 信托双层', '生前赠与 + 持股平台', '保险金传承 + 指定受益人', '不立遗嘱默认继承'],
+    longTermLoss:
+      '错过这扇门：不立遗嘱进入法定继承，子女 / 配偶 / 父母按份共有，重组家庭与跨境资产场景下极易引发诉讼；意识能力评估一旦在 70+ 出现争议，事后任何安排都可能被推翻，传承秩序与家族关系同时承压。',
+  },
+  {
+    id: 'second_career_founder',
+    title: '二次创业 / 55+ 老兵创始人窗口',
+    ageStart: 50,
+    ageEnd: 65,
+    talents: ['business', 'social'],
+    track: 'career',
+    branches: ['行业老兵主导赛道创业', '与年轻团队联合创办', '收购成熟小公司当 CEO', '只做轻量个人工作室'],
+    longTermLoss:
+      '错过这扇门：行业资源 / 渠道 / 信任资本的变现窗口与体力 / 决策强度叠加，60 岁后募资方对创始人体力与接班结构的尽调权重明显加大；过窗后只能退守顾问与挂名董事，主导权与股权杠杆都被压缩。',
+  },
+  {
+    id: 'angel_investor_advisor',
+    title: '天使投资人 / 产业顾问 / LP 身份建立',
+    ageStart: 52,
+    ageEnd: 72,
+    talents: ['business', 'social'],
+    track: 'career',
+    branches: ['个人天使 + 跟投基金', '加入 GP 做产业合伙人', '只做付费顾问 / 独立董事', '彻底退出商业网络'],
+    longTermLoss:
+      '错过这扇门：天使 / 顾问身份的入场券来自仍在场内的人脉与 deal flow，离场 3-5 年后基本被新一代替换；中老年人通过资本与经验放大影响力的杠杆窗口一旦关上，只剩消费型退休路径。',
+  },
+  {
+    id: 'author_thought_leader',
+    title: '写书 / 出版 / 思想体系输出窗口',
+    ageStart: 50,
+    ageEnd: 75,
+    talents: ['academic', 'expression'],
+    track: 'career',
+    branches: ['系统性出版（专著 / 回忆录）', '长期专栏 + 公众号 / 播客', '高校客座讲席', '只在私域闭门分享'],
+    longTermLoss:
+      '错过这扇门：精力 / 表达力 / 时代相关性的三重交集很窄，过 70 岁后系统性著述的体力与编辑配合成本陡升；个人经验未结构化沉淀，等同于一生方法论随个体消散，影响力无法跨代复利。',
+  },
+  {
+    id: 'public_office_legacy',
+    title: '政协 / 人大 / 行业终身成就 / 公众身份窗口',
+    ageStart: 55,
+    ageEnd: 78,
+    talents: ['discipline', 'social'],
+    track: 'career',
+    branches: ['争取政协 / 人大席位', '行业协会会长 / 标准委员会', '高校名誉教授 / 终身成就奖', '保持私人身份不出场'],
+    longTermLoss:
+      '错过这扇门：体制内荣誉席位与行业终身荣誉的提名链路依赖在任时段的关系积累与作品基线，离场后基本只能由后辈代为追认；公众身份红利（话语权 / 资源调动 / 子女资源）在过窗后不可补领。',
+  },
+  {
+    id: 'spiritual_practice_deepening',
+    title: '宗教 / 哲学修行深化窗口（精神体系沉淀）',
+    ageStart: 50,
+    ageEnd: 80,
+    talents: ['academic', 'social'],
+    track: 'love',
+    branches: ['系统皈依 / 长期师承', '哲学体系自学 + 私塾', '冥想 / 内观 / 长期闭关', '保持世俗不进入'],
+    longTermLoss:
+      '错过这扇门：精神体系的内化需要长期、低干扰的练习与导师反馈窗口，70+ 后认知与体力下降时再起步，难以建立稳定的内在秩序；老年期心灵无所归依，孤独与死亡焦虑的成本会显著外溢到家庭。',
+  },
+  {
+    id: 'charity_foundation_legacy',
+    title: '慈善基金 / 公益体系建立（成为思想 / 精神领袖路径）',
+    ageStart: 55,
+    ageEnd: 80,
+    talents: ['business', 'social'],
+    track: 'career',
+    branches: ['注册个人 / 家族慈善基金会', '挂靠大基金做冠名项目', '长期定向捐赠 + 不设机构', '只在去世后由遗嘱处置'],
+    longTermLoss:
+      '错过这扇门：慈善基金会的合规架构、品牌叙事与受助网络至少需要 5-10 年沉淀才能形成自运转，过 75 岁再起步往往沦为子女代管或被并入他人体系；个人价值观无法转译为跨代制度，精神 / 影响力的归宿失去载体。',
+  },
+  {
+    id: 'late_remarriage',
+    title: '黄昏恋 / 再婚 / 长伴侣重组窗口',
+    ageStart: 50,
+    ageEnd: 72,
+    talents: ['social'],
+    track: 'love',
+    branches: ['正式再婚 + 婚前财产协议', '同居伴侣不登记', '跨地两地稳定关系', '主动选择长期独身'],
+    longTermLoss:
+      '错过这扇门：60+ 长期伴侣的供给端急剧收窄，健康 / 照护 / 经济结构的匹配难度逐年上升；不进入伴侣关系，老年期日间照护与医疗代理几乎只能依赖子女或机构，决策自由度与生活质量同步下行。',
+  },
+  {
+    id: 'extramarital_risk_midlate',
+    title: '婚外关系风险与法律 / 道德代价窗口',
+    ageStart: 45,
+    ageEnd: 70,
+    talents: ['social', 'business'],
+    track: 'love',
+    branches: ['主动设定边界 + 关系咨询', '与配偶谈判开放式约定', '隐性长期出轨', '一次性事件 + 立即止损'],
+    longTermLoss:
+      '错过这扇门：中老年婚外关系叠加财产 / 子女 / 继承结构，一旦曝光，离婚财产分割、继承顺位与名誉资本同时崩塌；多地司法对"夫妻共同财产赠与第三者"普遍可追回，但社会关系与子女信任的损伤不可逆，长期代价远高于关系本身收益。',
+  },
 ]
 
 type OpportunityStatus = 'upcoming' | 'current' | 'closing' | 'missed'
