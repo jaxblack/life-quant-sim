@@ -177,6 +177,89 @@ video {
 .lqs-status-delta {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 999px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 8px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+.lqs-status-card[data-trend='up'] .lqs-status-delta {
+  background: rgba(16, 185, 129, 0.16);
+}
+.lqs-status-card[data-trend='down'] .lqs-status-delta {
+  background: rgba(248, 113, 113, 0.18);
+}
+.lqs-status-card[data-trend='flat'] .lqs-status-delta {
+  background: rgba(148, 163, 184, 0.16);
+}
+.lqs-status-score {
+  align-self: end;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+.lqs-status-score span {
+  margin-left: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.72;
+}
+.lqs-status-card[data-score-band='high'] .lqs-status-score {
+  color: #047857;
+  background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
+}
+.lqs-status-card[data-score-band='mid'] .lqs-status-score {
+  color: #92400e;
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+}
+.lqs-status-card[data-score-band='low'] .lqs-status-score {
+  color: #b91c1c;
+  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+}
+.lqs-playback-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -4px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.lqs-playback-controls button {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+.lqs-playback-controls button:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+}
+.lqs-playback-controls button.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+.lqs-playback-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lqs-playback-speeds {
+  display: inline-flex;
+  gap: 6px;
 }
 @media (max-width: 640px) {
   .lqs-status-cards {
@@ -188,7 +271,8 @@ video {
   .lqs-fade-in,
   .lqs-track-tab,
   .lqs-chip,
-  .lqs-status-card {
+  .lqs-status-card,
+  .lqs-playback-controls button {
     animation: none !important;
     transition: none !important;
   }

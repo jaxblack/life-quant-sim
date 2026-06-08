@@ -1161,8 +1161,16 @@ function classifyWindow(age: number, win: OpportunityWindow): OpportunityStatus 
   return 'current'
 }
 
+const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const
+type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number]
+const BASE_MS_PER_YEAR = 5000
+
 export default function SimPage() {
   const [age, setAge] = useState<number>(18)
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(true)
+  const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(1)
+  const animationFrameRef = useRef<number | null>(null)
+  const lastFrameMsRef = useRef<number | null>(null)
   const [regionId, setRegionId] = useState<string>(REGIONS[1].id)
   const [familyId, setFamilyId] = useState<string>(FAMILIES[1].id)
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
@@ -1193,6 +1201,9 @@ export default function SimPage() {
   const region = REGIONS.find((r) => r.id === regionId) ?? REGIONS[0]
   const family = FAMILIES.find((f) => f.id === familyId) ?? FAMILIES[0]
   const stage = useMemo(() => stageOfAge(age), [age])
+  const displayAge = Math.round(age)
+  const scoreBandOf = (score: number) =>
+    score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'
 
   const toggleTalent = (id: Talent) => {
     setSelectedTalents((prev) =>
@@ -1203,6 +1214,46 @@ export default function SimPage() {
     setFamilyBg((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
+  }
+
+  useEffect(() => {
+    if (!isTimelinePlaying) {
+      lastFrameMsRef.current = null
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      return
+    }
+
+    const tick = (now: number) => {
+      const last = lastFrameMsRef.current ?? now
+      const elapsed = Math.min(now - last, 250)
+      lastFrameMsRef.current = now
+      setAge((prev) => {
+        const next = prev + (elapsed / BASE_MS_PER_YEAR) * timelineSpeed
+        if (next > 100) return 1 + ((next - 1) % 100)
+        return Math.max(1, next)
+      })
+      animationFrameRef.current = requestAnimationFrame(tick)
+    }
+
+    animationFrameRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      lastFrameMsRef.current = null
+    }
+  }, [isTimelinePlaying, timelineSpeed])
+
+  const pauseTimeline = () => setIsTimelinePlaying(false)
+  const resumeTimeline = () => setIsTimelinePlaying(true)
+  const resetTimeline = () => {
+    lastFrameMsRef.current = null
+    setAge(1)
+    setIsTimelinePlaying(false)
   }
 
   // 根据“教养氛围”多选过滤出“出身家庭”可选项。未选任何氛围时，退回全部。
@@ -1688,11 +1739,13 @@ export default function SimPage() {
               const sign = c.delta > 0 ? '+' : c.delta < 0 ? '−' : '±'
               const absDelta = Math.abs(c.delta).toFixed(c.deltaPrecision)
               const deltaText = `${sign}${absDelta} ${c.unit}`
+              const scoreBand = scoreBandOf(c.score)
               return (
                 <div
                   key={c.key}
                   className="lqs-status-card lqs-fade-in"
                   data-trend={c.trend}
+                  data-score-band={scoreBand}
                   style={{
                     padding: 10,
                     border: `1px solid ${border}`,
@@ -1718,11 +1771,11 @@ export default function SimPage() {
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
                     <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5, flex: 1 }}>{c.hint}</div>
                     <div
+                      className="lqs-status-score"
                       title={`当前指标值: ${c.score} ${c.unit}（与上一时间步比较 ${deltaText}）`}
-                      style={{ fontSize: 11, color: '#374151', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
                     >
                       {c.score}
-                      <span style={{ color: '#9ca3af', marginLeft: 2 }}>{c.unit}</span>
+                      <span>{c.unit}</span>
                     </div>
                   </div>
                 </div>
@@ -1745,7 +1798,7 @@ export default function SimPage() {
             {/* 人物成长 / 走路动画: 轻量 SVG + CSS, 不依赖表变 / 点击逻辑, 只读 stage 与 age。 */}
             <CharacterStage
               stageId={stage.id}
-              age={age}
+              age={displayAge}
               stageName={stage.name}
               regionName={region.name}
               familyName={family.name}
@@ -1760,7 +1813,7 @@ export default function SimPage() {
               }}
             >
               <div className="lqs-timeline-head-age" style={{ fontSize: 18, fontWeight: 600 }}>
-                {age} 岁 · {stage.name}
+                {displayAge} 岁 · {stage.name}
               </div>
               <div className="lqs-timeline-head-range" style={{ color: '#6b7280', fontSize: 13 }}>
                 当前阶段范围 {stage.ageStart}-{stage.ageEnd} 岁
@@ -1768,14 +1821,37 @@ export default function SimPage() {
             </div>
             <input
               type="range"
-              min={0}
+              min={1}
               max={100}
-              step={1}
+              step={0.1}
               value={age}
-              onChange={(e) => setAge(Number(e.target.value))}
+              onChange={(e) => {
+                setIsTimelinePlaying(false)
+                setAge(Number(e.target.value))
+              }}
               style={{ width: '100%' }}
               aria-label="年龄滑块"
             />
+            <div className="lqs-playback-controls" aria-label="时间轴自动播放控制">
+              <button type="button" onClick={isTimelinePlaying ? pauseTimeline : resumeTimeline}>
+                {isTimelinePlaying ? '暂停' : '继续'}
+              </button>
+              <button type="button" onClick={resetTimeline}>重置</button>
+              <span className="lqs-playback-label">5 秒/岁</span>
+              <div className="lqs-playback-speeds" role="group" aria-label="播放倍速">
+                {PLAYBACK_SPEEDS.map((speed) => (
+                  <button
+                    key={speed}
+                    type="button"
+                    className={timelineSpeed === speed ? 'is-active' : ''}
+                    aria-pressed={timelineSpeed === speed}
+                    onClick={() => setTimelineSpeed(speed)}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
+            </div>
             <div
               className="lqs-timeline-bar"
               style={{
