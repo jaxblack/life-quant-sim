@@ -1167,6 +1167,28 @@ export default function SimPage() {
   // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
   // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
   const FUTURE_HORIZON_YEARS = 10
+
+  // 刚刚错过的人生窗口：仅显示过去 N 步（=N 岁）内刚关闭的窗口；
+  // 错过太久的不显示以节省空间。
+  // 与现有 showMissed 开关解耦：勾选 showMissed 时主列表已全量回顾，
+  // 这个底部区块就不重复渲染。
+  const MISSED_WINDOW_LOOKBACK = 5
+  const recentlyMissedWindows = useMemo(() => {
+    if (showMissed) return [] as OpportunityWindow[]
+    const byTalent = OPPORTUNITY_WINDOWS.filter((w) =>
+      w.talents.some((t) => selectedTalents.includes(t))
+    )
+    const byTrack = byTalent.filter(
+      (w) => w.track === trackTab || w.track === 'both'
+    )
+    const missed = byTrack.filter((w) => {
+      if (classifyWindow(age, w) !== 'missed') return false
+      const yearsSinceMissed = age - w.ageEnd
+      return yearsSinceMissed > 0 && yearsSinceMissed <= MISSED_WINDOW_LOOKBACK
+    })
+    // 按"错过得越近越靠前"排序（yearsSinceMissed 升序）。
+    return missed.sort((a, b) => (age - a.ageEnd) - (age - b.ageEnd))
+  }, [age, selectedTalents, showMissed, trackTab])
   const visibleWindows = useMemo(() => {
     const byTalent = OPPORTUNITY_WINDOWS.filter((w) =>
       w.talents.some((t) => selectedTalents.includes(t))
@@ -1989,6 +2011,112 @@ export default function SimPage() {
                 )
               })}
             </ul>
+
+            {/* 刚刚错过的人生窗口（过去 MISSED_WINDOW_LOOKBACK 岁内）。
+                位置：主窗口列表底部；视觉：半透明 + 灰度 + 标题划线，
+                明确区别于上方未来 / 当前可点击窗口。 */}
+            {recentlyMissedWindows.length > 0 && (
+              <div
+                aria-label="刚刚错过的人生窗口"
+                style={{
+                  display: 'grid',
+                  gap: 8,
+                  marginTop: 4,
+                  paddingTop: 12,
+                  borderTop: '1px dashed #d1d5db',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+                    刚刚错过的人生窗口
+                  </h3>
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                    过去 {MISSED_WINDOW_LOOKBACK} 岁内 · 错过太久的不再列出
+                  </span>
+                </div>
+                <ul
+                  style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'grid',
+                    gap: 6,
+                  }}
+                >
+                  {recentlyMissedWindows.map((win) => {
+                    const yearsSinceMissed = age - win.ageEnd
+                    return (
+                      <li
+                        key={`missed-${win.id}`}
+                        aria-disabled="true"
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          background: '#f3f4f6',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          display: 'grid',
+                          gap: 4,
+                          opacity: 0.55,
+                          color: '#6b7280',
+                          cursor: 'not-allowed',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'baseline',
+                            gap: 8,
+                            fontSize: 13,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: 'white',
+                              background: '#9ca3af',
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              textTransform: 'none',
+                            }}
+                          >
+                            已错过
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              textDecoration: 'line-through',
+                              textDecorationColor: '#9ca3af',
+                            }}
+                          >
+                            {win.title}
+                          </span>
+                          <span style={{ fontSize: 12 }}>
+                            窗口 {win.ageStart}-{win.ageEnd} 岁
+                          </span>
+                          <span style={{ fontSize: 12 }}>
+                            · 错过 {yearsSinceMissed} 年（{win.ageEnd} 岁时关闭）
+                          </span>
+                        </div>
+                        {win.longTermLoss && (
+                          <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                            遗憾：{win.longTermLoss}
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
           </section>
           </div>
         </div>
