@@ -193,21 +193,25 @@ video {
 }
 .lqs-status-score {
   align-self: end;
-  padding: 4px 8px;
-  border-radius: 10px;
-  font-size: 16px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  font-size: 32px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 6px 14px rgba(15, 23, 42, 0.08);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 8px 18px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.56);
 }
 .lqs-status-score span {
-  margin-left: 2px;
-  font-size: 10px;
+  margin-left: 3px;
+  font-size: 14px;
   font-weight: 800;
-  opacity: 0.72;
+  opacity: 0.8;
 }
 .lqs-status-card[data-score-band='high'] .lqs-status-score {
   color: #047857;
@@ -264,6 +268,13 @@ video {
 @media (max-width: 640px) {
   .lqs-status-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .lqs-status-score {
+    font-size: 28px;
+    padding: 6px 10px;
+  }
+  .lqs-status-score span {
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -403,7 +414,7 @@ video {
 .lqs-character-stage {
   position: relative;
   width: 100%;
-  height: 110px;
+  height: 170px;
   /* 三段叠加: 远天 → 远山雾 → 近地. */
   background:
     radial-gradient(ellipse 70% 40% at 50% 105%, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0) 60%),
@@ -602,7 +613,7 @@ video {
 
 @media (max-width: 640px) {
   .lqs-character-stage {
-    height: 92px;
+    height: 140px;
     --lqs-walker-w: 48px;
   }
 }

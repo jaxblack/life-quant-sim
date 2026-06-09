@@ -431,7 +431,7 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         W = host.clientWidth || W
         H = host.clientHeight || H
         app.renderer.resize(W, H)
-        const targetFullPx = H * 0.62
+        const targetFullPx = H * 0.82
         scale = targetFullPx / 72
         figure.scale.set(scale)
         groundY = H - 16

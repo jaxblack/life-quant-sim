@@ -165,7 +165,20 @@ function CharacterStage({ stageId, age, progress, stageName, regionName, familyN
   )
 }
 
-type Region = { id: string; name: string; brief: string }
+type RegionId =
+  | 'tier1'
+  | 'tier2'
+  | 'tier34'
+  | 'county'
+  | 'rural'
+  | 'overseas_us'
+  | 'overseas_ca'
+  | 'overseas_sg'
+  | 'overseas_my'
+  | 'overseas_au'
+  | 'overseas_uk'
+
+type Region = { id: RegionId; name: string; brief: string }
 type Family = { id: string; name: string; brief: string }
 
 const REGIONS: Region[] = [
@@ -174,7 +187,12 @@ const REGIONS: Region[] = [
   { id: 'tier34', name: '三四线城市', brief: '节奏稳定，发展机会与天花板均偏低。' },
   { id: 'county', name: '县城 / 乡镇', brief: '熟人社会，关系链强，但圈层流动通常需要离开。' },
   { id: 'rural', name: '农村', brief: '与土地紧密相连，教育与医疗资源相对稀缺。' },
-  { id: 'overseas', name: '海外', brief: '异质文化环境，高语言成本带来潜在的跨界红利。' },
+  { id: 'overseas_us', name: '美国（华人）', brief: '顶尖高校与行业机会多，竞争极强；身份与签证不确定性高。' },
+  { id: 'overseas_ca', name: '加拿大（华人）', brief: '移民通道相对清晰，生活稳定；职业天花板与税负需要权衡。' },
+  { id: 'overseas_sg', name: '新加坡（华人）', brief: '华语环境友好、治安与秩序佳；节奏快、住房与教育压力高。' },
+  { id: 'overseas_my', name: '马来西亚（华人）', brief: '华文生态成熟、生活成本友好；高薪岗位密度与国际跳板需规划。' },
+  { id: 'overseas_au', name: '澳大利亚（华人）', brief: '教育与生活质量高；移民政策与职业评估对年龄较敏感。' },
+  { id: 'overseas_uk', name: '英国（华人）', brief: '教育资源密集、金融与创意行业机会多；长期身份与税务成本需评估。' },
 ]
 
 const FAMILIES: Family[] = [
@@ -187,10 +205,15 @@ const FAMILIES: Family[] = [
 ]
 
 function stageOfAge(age: number): LifeStage {
-  return (
-    STAGES.find((s) => age >= s.ageStart && age <= s.ageEnd) ??
-    STAGES[STAGES.length - 1]
-  )
+  // 取 ageStart 不超过当前年龄的最后一个阶段。
+  // 这样小数年龄（自动播放时）落在整数边界的"缝隙"里也能正确归属，
+  // 不会因为 age <= ageEnd 不满足而回退到最后一个阶段（高龄）。
+  let matched = STAGES[0]
+  for (const s of STAGES) {
+    if (age >= s.ageStart) matched = s
+    else break
+  }
+  return matched
 }
 
 // 个人天赋分类：用于筛选"该天赋下最该抓住的人生窗口"。
@@ -235,6 +258,80 @@ const FAMILY_BACKGROUNDS: { id: FamilyBackground; name: string; brief: string; f
   { id: 'multigen', name: '隔代分住', brief: '以祖辈为主要照顾者，父母远在或仅负责汇款；多为留守 / 务工家庭。', familyIds: ['leftbehind', 'poor'] },
 ]
 
+type FamilyBgEffect = {
+  education: number
+  identity: number
+  body: number
+  wealth: number
+  focus: string
+}
+
+const FAMILY_BG_EFFECTS: Record<FamilyBackground, FamilyBgEffect> = {
+  democratic: {
+    education: 3,
+    identity: 2,
+    body: 1,
+    wealth: 0,
+    focus: '沟通与自主决策强，学业与社交协同更好。',
+  },
+  authoritative: {
+    education: 2,
+    identity: -1,
+    body: 0,
+    wealth: 1,
+    focus: '执行力与规则感强，短期成绩更稳但表达弹性偏低。',
+  },
+  permissive: {
+    education: -2,
+    identity: 1,
+    body: -1,
+    wealth: 0,
+    focus: '情感支持高但边界弱，长期自律成本更高。',
+  },
+  distant: {
+    education: -2,
+    identity: -2,
+    body: -1,
+    wealth: 0,
+    focus: '陪伴密度不足，亲密关系与稳定学习习惯建立更慢。',
+  },
+  multigen: {
+    education: -1,
+    identity: -1,
+    body: 1,
+    wealth: -1,
+    focus: '照护连续性较好，但代际教育资源与决策协同偏弱。',
+  },
+}
+
+const REGION_IDENTITY_BASE: Record<RegionId, number> = {
+  tier1: 85,
+  tier2: 65,
+  tier34: 45,
+  county: 30,
+  rural: 18,
+  overseas_us: 74,
+  overseas_ca: 72,
+  overseas_sg: 78,
+  overseas_my: 61,
+  overseas_au: 70,
+  overseas_uk: 73,
+}
+
+const REGION_IDENTITY_HINT: Record<RegionId, string> = {
+  tier1: '一线城市身份 / 高资源密度',
+  tier2: '新一线身份 / 资源中上',
+  tier34: '三四线身份 / 资源中等',
+  county: '县城身份 / 依赖熟人网络',
+  rural: '农村身份 / 跨阶层需要离开',
+  overseas_us: '美国华人身份 / 高机会高签证风险',
+  overseas_ca: '加拿大华人身份 / 稳定路径与税负并存',
+  overseas_sg: '新加坡华人身份 / 高密度机会高成本',
+  overseas_my: '马来西亚华人身份 / 华文生态友好',
+  overseas_au: '澳洲华人身份 / 生活质量高、评估严格',
+  overseas_uk: '英国华人身份 / 教育金融资源密集',
+}
+
 // 人生窗口的领域线：用于"感情线 / 事业线"切换
 // 'love' = 感情线（婚恋 / 亲密关系），'career' = 事业线（学业 / 职业 / 移民 / 资产）
 // 'both' = 两条线都要展示的窗口（如生育/家庭，事业与亲密关系都受影响）
@@ -275,7 +372,10 @@ type OpportunityWindow = {
   ageStart: number
   ageEnd: number
   talents: Talent[]
+  talentMode?: 'any' | 'all'
   track: Track // 感情线 / 事业线 / 两者都涉及
+  regions?: RegionId[]
+  familyBackgrounds?: FamilyBackground[]
   branches: WindowBranch[] // 候选分岔（≥3）；对象形式可携带 next 子分支
   longTermLoss: string // 错过窗口后的长期机会成本提示
 }
@@ -319,7 +419,8 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     title: '电竞职业选手窗口',
     ageStart: 13,
     ageEnd: 22,
-    talents: ['tech_esports', 'sports'],
+    talents: ['tech_esports'],
+    talentMode: 'all',
     track: 'career',
     branches: ['青训营 / 职业战队', '半职业 + 直播', '业余高分段', '只当娱乐'],
     longTermLoss:
@@ -574,6 +675,7 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 35,
     talents: ['academic', 'business', 'tech_esports'],
     track: 'career',
+    regions: ['overseas_ca'],
     branches: [
       {
         id: 'ee_independent',
@@ -599,6 +701,7 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 38,
     talents: ['academic', 'business', 'tech_esports'],
     track: 'career',
+    regions: ['overseas_au'],
     branches: ['189 独立技移', '190 / 491 州担保', '482 / 186 雇主担保', '商业投资类签证'],
     longTermLoss:
       '错过这扇门：澳大利亚技移年龄分 25-32 岁最高，过 45 岁多数技移名单关闭；后期仅剩雇主担保与投资路径，资金与雇主资源門槛明显高于默认路径。',
@@ -610,6 +713,7 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 40,
     talents: ['academic', 'business', 'tech_esports'],
     track: 'career',
+    regions: ['overseas_sg'],
     branches: ['EP 高薪岗 + PR 申请', 'Tech.Pass / ONE Pass 高端人才', 'GIP 商业投资者', '仅作为外派驻点不转身份'],
     longTermLoss:
       '错过这扇门：新加坡 PR 审批偏好年轻高薪与技术专家，40+ 首次申请成功率明显下降；不转 PR / 公民则法定购房、子女教育、医疗供给都以外籍价格计算，生活成本長期高位。',
@@ -621,6 +725,7 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     ageEnd: 45,
     talents: ['business', 'academic'],
     track: 'career',
+    regions: ['overseas_us', 'overseas_ca', 'overseas_sg', 'overseas_my', 'overseas_au', 'overseas_uk'],
     branches: ['一本护照上身份变革', '多本护照多身份组合', '只走长期居留', '完全不出境'],
     longTermLoss:
       '错过这扇门：护照升级与投资身份项目资金门槛随全球政策随年上调，中文跨境资产配置与子女教育路径的可选项同步收窄。',
@@ -747,6 +852,257 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     longTermLoss:
       '错过这扇门：中老年婚外关系叠加财产 / 子女 / 继承结构，一旦曝光，离婚财产分割、继承顺位与名誉资本同时崩塌；多地司法对"夫妻共同财产赠与第三者"普遍可追回，但社会关系与子女信任的损伤不可逆，长期代价远高于关系本身收益。',
   },
+  // —— 童年 / 少年细化：教育路径与感情线 ——
+  {
+    id: 'parent_companionship_childhood',
+    title: '父母陪伴密度窗口（依恋与安全感）',
+    ageStart: 0,
+    ageEnd: 12,
+    talents: ['social'],
+    track: 'love',
+    familyBackgrounds: ['democratic', 'distant', 'multigen', 'permissive'],
+    branches: [
+      {
+        id: 'daily_presence',
+        label: '高陪伴（日常共餐/共读/稳定回应）',
+        next: [
+          { domain: 'family', label: '稳定依恋形成', longTermLoss: '0-6 岁回应一致性是安全依恋核心输入，长期影响亲密关系中的信任阈值。' },
+          { domain: 'education', label: '家庭阅读习惯建立', longTermLoss: '小学前语言输入总量差异会直接外溢到阅读速度与抽象表达能力。' },
+          { domain: 'health', label: '情绪共调能力提升', longTermLoss: '童年情绪命名与安抚经验不足，成年后压力管理成本明显提高。' },
+        ],
+      },
+      '中等陪伴（周末集中陪伴）',
+      '低陪伴（长期异地/高强度工作）',
+      '主要由祖辈照护',
+    ],
+    longTermLoss:
+      '错过这扇门：童年依恋与情绪调节能力是后续亲密关系和学习自驱力的地基，后补通常需要更长心理成本。',
+  },
+  {
+    id: 'junior_school_choice',
+    title: '初中择校窗口（公办/民办/国际）',
+    ageStart: 11,
+    ageEnd: 15,
+    talents: ['academic', 'discipline'],
+    track: 'career',
+    regions: ['tier1', 'tier2', 'tier34', 'county', 'rural'],
+    branches: [
+      {
+        id: 'public_key_junior',
+        label: '冲刺重点公办初中',
+        next: [
+          { domain: 'education', label: '竞赛/培优体系提前接入', longTermLoss: '初中阶段错过高质量数理训练，后续竞赛与强基路径进入难度大增。' },
+          { domain: 'family', label: '学区迁移与陪读安排', longTermLoss: '择校常伴随家庭通勤与居住重构，执行不稳会反向拖累学习连续性。' },
+        ],
+      },
+      '民办初中（高压应试）',
+      '国际初中（IB/MYP/双语）',
+      '就近普通初中',
+    ],
+    longTermLoss:
+      '错过这扇门：初中阶段决定学习习惯和同伴密度，直接影响高中分层与后续升学赛道入口。',
+  },
+  {
+    id: 'high_school_choice',
+    title: '高中择校窗口（普高/国际/职高）',
+    ageStart: 14,
+    ageEnd: 18,
+    talents: ['academic', 'tech_esports', 'arts'],
+    track: 'career',
+    regions: ['tier1', 'tier2', 'tier34', 'county', 'rural'],
+    branches: [
+      '重点普高冲一本',
+      '国际高中走海外本科',
+      '职高/中职走技能路径',
+      '普高保底 + 艺体特长',
+    ],
+    longTermLoss:
+      '错过这扇门：高中路径决定高考/留学/技能就业三条主干道，切换成本在 17 岁后快速上升。',
+  },
+  {
+    id: 'gaokao_migration',
+    title: '高考移民 / 异地升学窗口',
+    ageStart: 16,
+    ageEnd: 19,
+    talents: ['academic', 'discipline'],
+    track: 'career',
+    regions: ['tier1', 'tier2', 'tier34', 'county', 'rural'],
+    branches: [
+      '合规随迁 + 本地高考',
+      '回原籍高考',
+      '港澳台/海外本科替代',
+      '高职单招/春招',
+    ],
+    longTermLoss:
+      '错过这扇门：高考地域政策与户籍/学籍绑定，时序错误会直接丢失当届考试资格或优先录取权。',
+  },
+  {
+    id: 'adolescent_attachment_repair',
+    title: '青春期关系修复窗口（亲子/同伴/初恋）',
+    ageStart: 13,
+    ageEnd: 22,
+    talents: ['social', 'expression'],
+    track: 'love',
+    familyBackgrounds: ['distant', 'authoritative', 'permissive'],
+    branches: [
+      {
+        id: 'family_therapy_track',
+        label: '亲子沟通+咨询介入',
+        next: [
+          { domain: 'family', label: '重建冲突规则与边界', longTermLoss: '青春期冲突若长期失控，会在大学/初职阶段外化为回避沟通与关系极化。' },
+          { domain: 'health', label: '焦虑/抑郁早筛早治', longTermLoss: '16-22 岁是情绪障碍高发窗口，早干预可显著降低成年期复发率。' },
+        ],
+      },
+      '通过同伴社群慢慢修复',
+      '维持表面和平但不解决根因',
+      '关系破裂后长期断联',
+    ],
+    longTermLoss:
+      '错过这扇门：青春期关系脚本会迁移到成年亲密关系与职场协作，延迟修复会放大长期心理与关系成本。',
+  },
+  {
+    id: 'premarital_contract_design',
+    title: '婚前协议 / 财产边界设计窗口',
+    ageStart: 24,
+    ageEnd: 40,
+    talents: ['social', 'business'],
+    track: 'both',
+    branches: [
+      {
+        id: 'prenup_plus_trust',
+        label: '婚前协议 + 保单/信托组合',
+        next: [
+          { domain: 'asset', label: '婚前婚后资产分层', longTermLoss: '未分层时，一旦离婚或继承触发，共同财产界定争议会吞噬多年增值。' },
+          { domain: 'family', label: '再婚家庭继承顺位设计', longTermLoss: '重组家庭不提前设计受益人，老年医疗代理与遗产分配冲突概率显著上升。' },
+        ],
+      },
+      '仅口头约定不落文书',
+      '完全共同财产模式',
+      '长期同居不登记',
+    ],
+    longTermLoss:
+      '错过这扇门：情感关系进入制度化后再补边界，谈判成本与信任摩擦都更高。',
+  },
+  // —— 海外华人高频国家：差异化窗口 ——
+  {
+    id: 'us_k12_college_path',
+    title: '美国 K12→本科路径（AP/竞赛/活动组合）',
+    ageStart: 12,
+    ageEnd: 18,
+    talents: ['academic', 'expression'],
+    track: 'career',
+    regions: ['overseas_us'],
+    branches: [
+      'AP + SAT/ACT + 竞赛冲 Top 30',
+      '州立大学性价比路径',
+      '社区大学转学路径',
+      '回流亚洲高校',
+    ],
+    longTermLoss:
+      '错过这扇门：美国本科录取是长期档案制，11-12 年级才补活动与课程 rigor 往往来不及。',
+  },
+  {
+    id: 'us_h1b_opt_window',
+    title: '美国 OPT / H-1B 身份衔接窗口',
+    ageStart: 21,
+    ageEnd: 33,
+    talents: ['tech_esports', 'academic'],
+    track: 'career',
+    regions: ['overseas_us'],
+    branches: [
+      'STEM 专业 + OPT 延长',
+      '大厂抽签 + 绿卡排期',
+      '转去加拿大/新加坡再回流',
+      '直接回国发展',
+    ],
+    longTermLoss:
+      '错过这扇门：OPT 与 H-1B 时序错位会导致身份断档，职业轨迹被迫重启。',
+  },
+  {
+    id: 'canada_bilingual_track',
+    title: '加拿大双语/法语加分窗口（学签与移民协同）',
+    ageStart: 14,
+    ageEnd: 32,
+    talents: ['academic', 'social'],
+    track: 'career',
+    regions: ['overseas_ca'],
+    branches: [
+      '法语加分 + EE 直通',
+      '省提名定向专业',
+      'College 就业导向路径',
+      '只读书不做身份规划',
+    ],
+    longTermLoss:
+      '错过这扇门：加拿大政策重视语言与本地经历，早期不布局将显著抬高后续移民成本。',
+  },
+  {
+    id: 'sg_psle_aeis_stream',
+    title: '新加坡分流窗口（PSLE/AEIS/JC/Poly）',
+    ageStart: 10,
+    ageEnd: 18,
+    talents: ['academic', 'discipline'],
+    track: 'career',
+    regions: ['overseas_sg'],
+    branches: [
+      'PSLE 高分进名校链路',
+      'AEIS 入学后稳步上升',
+      'Poly→就业/大学路径',
+      '国际学校路径',
+    ],
+    longTermLoss:
+      '错过这扇门：新加坡教育体系分流早，赛道切换虽可行但每次转换都要付出时间与名额成本。',
+  },
+  {
+    id: 'my_chinese_independent_path',
+    title: '马来西亚华校路径窗口（独中/国民型/国际）',
+    ageStart: 12,
+    ageEnd: 19,
+    talents: ['academic', 'expression'],
+    track: 'career',
+    regions: ['overseas_my'],
+    branches: [
+      '独中统考（UEC）升学',
+      '国民型中学 + 双语强化',
+      '国际学校跳板',
+      '本地就业导向路径',
+    ],
+    longTermLoss:
+      '错过这扇门：华校体系、语言能力与大学申请规则强耦合，后期临时切轨会损失关键升学窗口。',
+  },
+  {
+    id: 'au_selective_school_migration',
+    title: '澳洲择校与职业评估联动窗口',
+    ageStart: 15,
+    ageEnd: 35,
+    talents: ['academic', 'tech_esports', 'business'],
+    track: 'career',
+    regions: ['overseas_au'],
+    branches: [
+      'Selective school / ATAR 冲刺',
+      '技术移民职业清单导向选专业',
+      '先就业再雇主担保',
+      '仅留学不做移民规划',
+    ],
+    longTermLoss:
+      '错过这扇门：澳洲移民与职业评估对专业、年限和年龄耦合度高，前置规划不足会导致毕业后路径骤窄。',
+  },
+  {
+    id: 'uk_a_level_ucas_path',
+    title: '英国 A-Level / UCAS 窗口（本科与实习协同）',
+    ageStart: 15,
+    ageEnd: 23,
+    talents: ['academic', 'expression'],
+    track: 'career',
+    regions: ['overseas_uk'],
+    branches: [
+      'A-Level 高配冲 G5',
+      'Foundation 过渡路径',
+      '本科 + 实习直连就业',
+      '读完即回流亚洲',
+    ],
+    longTermLoss:
+      '错过这扇门：UCAS 与实习节奏高度前置，错过早期申请窗口会连锁影响毕业后留英竞争力。',
+  },
 ]
 
 type OpportunityStatus = 'upcoming' | 'current' | 'closing' | 'missed'
@@ -773,7 +1129,7 @@ export default function SimPage() {
   const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(1)
   const animationFrameRef = useRef<number | null>(null)
   const lastFrameMsRef = useRef<number | null>(null)
-  const [regionId, setRegionId] = useState<string>(REGIONS[1].id)
+  const [regionId, setRegionId] = useState<RegionId>(REGIONS[1].id)
   const [familyId, setFamilyId] = useState<string>(FAMILIES[1].id)
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
     TALENTS.map((t) => t.id)
@@ -878,6 +1234,36 @@ export default function SimPage() {
     // 仅调整显示不仅 setState——避免反复渲染循环。
   }
 
+  // 教养氛围量化到连续分值：使其不仅影响下拉选项，也会影响状态分与窗口命中。
+  const bgEffect = useMemo(() => {
+    if (familyBg.length === 0) {
+      return { education: 0, identity: 0, body: 0, wealth: 0, focus: '未限定教养氛围：使用中性基准。' }
+    }
+    const sum = familyBg.reduce(
+      (acc, id) => {
+        const e = FAMILY_BG_EFFECTS[id]
+        acc.education += e.education
+        acc.identity += e.identity
+        acc.body += e.body
+        acc.wealth += e.wealth
+        return acc
+      },
+      { education: 0, identity: 0, body: 0, wealth: 0 },
+    )
+    const n = familyBg.length
+    const focus = familyBg
+      .map((id) => FAMILY_BG_EFFECTS[id].focus)
+      .slice(0, 2)
+      .join('；')
+    return {
+      education: sum.education / n,
+      identity: sum.identity / n,
+      body: sum.body / n,
+      wealth: sum.wealth / n,
+      focus,
+    }
+  }, [familyBg])
+
   // 当前状态卡：资产 / 身份 / 学历 / 身体机能。
   // 仅以 (age, region, family) 派生出“趋势”字符，不是真实模拟输出，用于 demo 中红/绿涨跌可视化。
   type StatTrend = 'up' | 'down' | 'flat'
@@ -903,30 +1289,36 @@ export default function SimPage() {
   //   身体 body: 分（婴幼儿爬升 → 25 岁前后峰值 → 老年衰退，0~100）
   const wealthScore = (() => {
     const familyBase =
-      familyId === 'wealthy' ? 500
-        : familyId === 'middle' ? 120
-        : familyId === 'working' ? 30
-        : 8
-    // 主动积累期：22-55 岁线性上升；55-70 平台；70+ 缓慢消耗。
+      familyId === 'wealthy' ? 400
+        : familyId === 'middle' ? 60
+        : familyId === 'working' ? 12
+        : 3
+    // 主动积累曲线（更贴近现实：钱很难赚）。
+    //   22-30 起步期：还贷 / 攒首付，积累极慢；
+    //   30-45 提速期：收入与复利同时起来，但被房贷 / 育儿成本拖累；
+    //   45-58 高位期：负担减轻 + 资历溢价，积累最快；
+    //   58-68 见顶平台：增量趋缓；
+    //   68+   消耗期：退休后净资产缓慢下行。
+    const seg = (from: number, to: number, slope: number) =>
+      Math.max(0, Math.min(age, to) - from) * slope
     let active = 0
-    if (age >= 22 && age < 55) active = (age - 22) * 18
-    else if (age >= 55 && age < 70) active = (55 - 22) * 18
-    else if (age >= 70) active = (55 - 22) * 18 - (age - 70) * 6
-    // 出身家庭对“主动积累斜率”的轻微加成。
-    const slopeBonus = familyId === 'wealthy' ? active * 0.4
-      : familyId === 'middle' ? active * 0.15
+    if (age >= 22) {
+      active =
+        seg(22, 30, 3) +   // 起步期：8 年才攒 ~24 万
+        seg(30, 45, 12) +  // 提速期：15 年 ~180 万
+        seg(45, 58, 18) +  // 高位期：13 年 ~234 万
+        seg(58, 68, 5)     // 平台期：增量很小
+      if (age > 68) active -= (age - 68) * 9 // 消耗期：退休后净资产下行
+    }
+    // 出身家庭对“主动积累斜率”的加成（资本越厚，钱生钱越快）。
+    const slopeBonus = familyId === 'wealthy' ? active * 0.45
+      : familyId === 'middle' ? active * 0.12
       : 0
-    return Math.max(0, Math.round(familyBase + active + slopeBonus))
+    return Math.max(0, Math.round(familyBase + active + slopeBonus + bgEffect.wealth * 6))
   })()
 
   const identityScore = (() => {
-    const regionBase =
-      regionId === 'overseas' ? 70
-        : regionId === 'tier1' ? 85
-        : regionId === 'tier2' ? 65
-        : regionId === 'tier34' ? 45
-        : regionId === 'county' ? 30
-        : 18
+    const regionBase = REGION_IDENTITY_BASE[regionId]
     // 年龄阶段红利：在校 < 应届 < 在职 < 中坚；老年回落。
     const stageBonus =
       age < 7 ? 0
@@ -936,7 +1328,7 @@ export default function SimPage() {
         : age < 60 ? 14
         : age < 75 ? 6
         : 0
-    const raw = regionBase + stageBonus - (age >= 60 ? (age - 60) * 0.3 : 0)
+    const raw = regionBase + stageBonus + bgEffect.identity * 2 - (age >= 60 ? (age - 60) * 0.3 : 0)
     return Math.max(0, Math.min(100, Math.round(raw * 10) / 10))
   })()
 
@@ -952,6 +1344,7 @@ export default function SimPage() {
     if (age >= 26) s += Math.min(60, age - 25) * 0.05 // 持续学习的边际加成（很小）
     // 老年期：学历折旧（行业更迭，含金量逐年下降）。
     if (age >= 60) s -= (age - 60) * 0.2
+    s += bgEffect.education * 1.5
     return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
   })()
 
@@ -963,6 +1356,7 @@ export default function SimPage() {
     else if (age <= 50) s = 100 - (age - 30) * 1.0
     else if (age <= 70) s = 80 - (age - 50) * 1.8
     else s = 80 - 20 * 1.8 - (age - 70) * 2.4
+    s += bgEffect.body * 1.4
     return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
   })()
 
@@ -1044,18 +1438,7 @@ export default function SimPage() {
         : age < 60
         ? '中坚力量'
         : '老年阶段'
-    const identityHint =
-      regionId === 'overseas'
-        ? '海外身份 / 可能需额外签证'
-        : regionId === 'tier1'
-        ? '一线城市身份 / 高资源密度'
-        : regionId === 'tier2'
-        ? '新一线身份 / 资源中上'
-        : regionId === 'tier34'
-        ? '三四线身份 / 资源中等'
-        : regionId === 'county'
-        ? '县城身份 / 依赖熟人网络'
-        : '农村身份 / 跨阶层需要离开'
+    const identityHint = `${REGION_IDENTITY_HINT[regionId]}；教养氛围：${bgEffect.focus}`
     const identityTrend: StatTrend = trendOf(dIdentity)
 
     return [
@@ -1071,11 +1454,15 @@ export default function SimPage() {
         hint:
           age < 22
             ? '仍主要以家庭资本为主，未进入主动积累阶段。'
-            : age < 55
-            ? '主动积累期，资产增长与职业选择强相关。'
-            : age < 70
-            ? '退休过渡期；资产以保值为主。'
-            : '主要依赖存量与社会保障，增长趣近于零。',
+            : age < 30
+            ? '起步期：收入低、还贷攒首付，钱很难存下来。'
+            : age < 45
+            ? '提速期：收入与复利起来，但被房贷 / 育儿成本拖累。'
+            : age < 58
+            ? '高位积累期：负担减轻 + 资历溢价，攒钱最快。'
+            : age < 68
+            ? '见顶平台期：增量趋缓，转向保值与传承规划。'
+            : '消耗期：退休后主要靠存量与社保，净资产缓慢下行。',
       },
       {
         key: 'identity',
@@ -1121,7 +1508,7 @@ export default function SimPage() {
             : '慢病管理期；医疗与生活质量成本上升。',
       },
     ]
-  }, [age, familyId, regionId, wealthScore, identityScore, educationScore, bodyScore, dWealth, dIdentity, dEducation, dBody])
+  }, [age, familyId, regionId, wealthScore, identityScore, educationScore, bodyScore, dWealth, dIdentity, dEducation, dBody, bgEffect])
 
   // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
   // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
@@ -1129,12 +1516,46 @@ export default function SimPage() {
   // 刚刚错过的人生窗口：默认在主列表底部列出过去 5 年内刚关闭的窗口，
   // 错过太久的超过该阈值则默认隐藏；showMissed=true 时才加载 5 年外的全量回顾。
   const MISSED_LOOKBACK_YEARS = 5
+
+  // 轻量“数据库”：把树状窗口按 talent/region/familyBg 建索引，便于后续规模化扩展。
+  const windowDb = useMemo(() => {
+    const byTalent: Record<Talent, OpportunityWindow[]> = {
+      sports: [],
+      arts: [],
+      academic: [],
+      social: [],
+      expression: [],
+      discipline: [],
+      tech_esports: [],
+      business: [],
+    }
+    for (const w of OPPORTUNITY_WINDOWS) {
+      for (const t of w.talents) byTalent[t].push(w)
+    }
+    return {
+      all: OPPORTUNITY_WINDOWS,
+      byTalent,
+      byId: new Map(OPPORTUNITY_WINDOWS.map((w) => [w.id, w])),
+    }
+  }, [])
+
   const visibleWindows = useMemo(() => {
-    const byTalent = OPPORTUNITY_WINDOWS.filter((w) =>
-      w.talents.some((t) => selectedTalents.includes(t))
+    const byTalent = windowDb.all.filter((w) => {
+      if (selectedTalents.length === 0) return false
+      if (w.talentMode === 'all') {
+        return w.talents.every((t) => selectedTalents.includes(t))
+      }
+      return w.talents.some((t) => selectedTalents.includes(t))
+    })
+    const byRegion = byTalent.filter(
+      (w) => !w.regions || w.regions.includes(regionId)
     )
+    const byFamilyBg = byRegion.filter((w) => {
+      if (!w.familyBackgrounds || familyBg.length === 0) return true
+      return w.familyBackgrounds.some((b) => familyBg.includes(b))
+    })
     // 感情线 / 事业线 tab 过滤：track === 'both' 的窗口两边都展示。
-    const byTrack = byTalent.filter(
+    const byTrack = byFamilyBg.filter(
       (w) => w.track === trackTab || w.track === 'both'
     )
     // missed 窗口过滤规则：
@@ -1171,7 +1592,7 @@ export default function SimPage() {
       }
       return a.ageStart - b.ageStart
     })
-  }, [age, selectedTalents, showMissed, trackTab])
+  }, [age, selectedTalents, showMissed, trackTab, regionId, familyBg, windowDb])
 
   return (
     // lqs-sim-page: 标记 /sim 页根节点, 配合 globals.css 中
@@ -1210,7 +1631,7 @@ export default function SimPage() {
             <div style={{ fontWeight: 600, marginBottom: 8 }}>出生地域</div>
             <select
               value={regionId}
-              onChange={(e) => setRegionId(e.target.value)}
+              onChange={(e) => setRegionId(e.target.value as RegionId)}
               style={{
                 width: '100%',
                 padding: 8,
@@ -1280,7 +1701,11 @@ export default function SimPage() {
                 lineHeight: 1.6,
               }}
             >
-              勾选教养氛围会限定下方"出身家庭"下拉中最常与之共现的家庭类型；不是严格一对一。
+              教养氛围不仅会限定下方"出身家庭"候选，还会影响四维分值与窗口命中：
+              学历 {bgEffect.education >= 0 ? '+' : ''}{bgEffect.education.toFixed(1)}、
+              身份 {bgEffect.identity >= 0 ? '+' : ''}{bgEffect.identity.toFixed(1)}、
+              身体 {bgEffect.body >= 0 ? '+' : ''}{bgEffect.body.toFixed(1)}、
+              资产 {bgEffect.wealth >= 0 ? '+' : ''}{bgEffect.wealth.toFixed(1)}。
             </p>
           </div>
 
@@ -1780,7 +2205,7 @@ export default function SimPage() {
             >
               {visibleWindows.length === 0 && (
                 <li style={{ color: '#6b7280', fontSize: 13, padding: 12 }}>
-                  当前"个人天赋"筛选下没有命中的窗口；尝试多勾选几个天赋类别。
+                  当前筛选（天赋 / 地域 / 教养氛围）下没有命中的窗口；尝试放宽筛选条件。
                 </li>
               )}
               {visibleWindows.map((win) => {
@@ -1802,6 +2227,14 @@ export default function SimPage() {
                   .map((t) => TALENTS.find((x) => x.id === t)?.name)
                   .filter(Boolean)
                   .join(' · ')
+                const regionNames = (win.regions ?? [])
+                  .map((id) => REGIONS.find((r) => r.id === id)?.name)
+                  .filter(Boolean)
+                  .join(' / ')
+                const bgNames = (win.familyBackgrounds ?? [])
+                  .map((id) => FAMILY_BACKGROUNDS.find((b) => b.id === id)?.name)
+                  .filter(Boolean)
+                  .join(' / ')
                 return (
                   <li
                     key={win.id}
@@ -1843,6 +2276,16 @@ export default function SimPage() {
                       <span style={{ color: '#6b7280', fontSize: 12 }}>
                         · 天赋：{talentNames}
                       </span>
+                      {regionNames && (
+                        <span style={{ color: '#6b7280', fontSize: 12 }}>
+                          · 地域：{regionNames}
+                        </span>
+                      )}
+                      {bgNames && (
+                        <span style={{ color: '#6b7280', fontSize: 12 }}>
+                          · 教养：{bgNames}
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{
