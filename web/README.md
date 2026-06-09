@@ -1,6 +1,6 @@
 # life-quant-sim-web
 Next.js 14 App Router 前端骨架。
-当前包含首页与 /sim 占位页。
+首页即量化人生模拟器（WebGL 小人沿时间轴行走）。
 暂不接入 engine API。
 
 ## 本地开发
