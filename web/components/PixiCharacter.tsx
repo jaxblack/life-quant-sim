@@ -137,7 +137,7 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const torsoH = figureH * 0.42
         const legTop = torsoTop + torsoH * (ap.paunch ? 0.96 : 1.0)
         const legH = figureH * 0.34
-        const limbW = 1.8
+        const limbW = 2.4
         const armH = torsoH * 0.92
         const upperArmH = armH * 0.52
         const foreArmH = armH * 0.5
@@ -200,7 +200,7 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const backForeG = new PIXI.Graphics()
         paintLimb(backForeG, limbW * 0.95, foreArmH, sleeveColor)
         const backHand = new PIXI.Graphics()
-        backHand.circle(0, foreArmH + 0.4, 0.95).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
+        backHand.circle(0, foreArmH + 0.4, 1.1).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
         backFore.addChild(backForeG)
         backFore.addChild(backHand)
         backArm.addChild(backFore)
@@ -257,6 +257,44 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         }
         if (ap.accessory === 'school_tie') {
           torsoG.rect(-headR * 0.95, torsoTop, headR * 1.9, 1.2).fill('#facc15')
+        }
+        // ---- 家境派生细节 ----
+        // 衣摆/领口镶边：富裕=金边醒目，中产=细描边，贫困=洗白旧边。
+        const trimW = ap.wealthTier === 'high' ? 0.7 : 0.4
+        const trimAlpha = ap.wealthTier === 'high' ? 0.95 : ap.wealthTier === 'low' ? 0.6 : 0.7
+        torsoG
+          .moveTo(-headR * 0.8, torsoTop + torsoH - 0.4)
+          .lineTo(headR * 0.8, torsoTop + torsoH - 0.4)
+          .stroke({ width: trimW, color: ap.outfitTrim, alpha: trimAlpha, cap: 'round' })
+        if (ap.wealthTier === 'high') {
+          // 金色领缘 + 立体高光，凸显质感。
+          torsoG
+            .moveTo(-headR * 0.6, torsoTop + 0.4)
+            .lineTo(0, torsoTop + torsoH * 0.26)
+            .lineTo(headR * 0.6, torsoTop + 0.4)
+            .stroke({ width: 0.6, color: ap.outfitTrim, alpha: 0.9, cap: 'round' })
+          // 纽扣线
+          for (let bi = 0; bi < 3; bi++) {
+            const by = torsoTop + torsoH * (0.4 + bi * 0.18)
+            torsoG.circle(0, by, 0.35).fill({ color: ap.outfitTrim, alpha: 0.95 })
+          }
+        }
+        // 胸袋巾（西装/公文包 + 富裕）。
+        if (ap.hasPocketSquare) {
+          torsoG.poly([
+            -headR * 0.62, torsoTop + torsoH * 0.34,
+            -headR * 0.34, torsoTop + torsoH * 0.34,
+            -headR * 0.48, torsoTop + torsoH * 0.46,
+          ]).fill({ color: '#fef3c7' }).stroke({ width: 0.25, color: ap.outfitTrim })
+        }
+        // 补丁（贫困/留守）：膝部与衣身各一块异色方块 + 缝线。
+        if (ap.patched) {
+          const patch = (px: number, py: number, s: number) => {
+            torsoG.roundRect(px - s / 2, py - s / 2, s, s, 0.5).fill({ color: ap.outfitTrim, alpha: 0.85 })
+            torsoG.rect(px - s / 2, py - s / 2, s, s).stroke({ width: 0.2, color: '#475569', alpha: 0.6 })
+          }
+          patch(headR * 0.4, torsoTop + torsoH * 0.62, 1.9)
+          patch(-headR * 0.5, torsoTop + torsoH * 0.78, 1.5)
         }
         torso.addChild(torsoG)
         body.addChild(torso)
@@ -321,7 +359,13 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const frontForeG = new PIXI.Graphics()
         paintLimb(frontForeG, limbW * 0.95, foreArmH, sleeveColor)
         const frontHand = new PIXI.Graphics()
-        frontHand.circle(0, foreArmH + 0.4, 0.95).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
+        frontHand.circle(0, foreArmH + 0.4, 1.1).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
+        // 富裕：前臂腕部金色腕表。
+        if (ap.hasWatch) {
+          frontForeG.rect(-limbW * 0.55, foreArmH - 1.4, limbW * 1.1, 1.0).fill({ color: '#1f2937' })
+          frontForeG.circle(0, foreArmH - 0.9, 0.9).fill({ color: ap.outfitTrim }).stroke({ width: 0.2, color: '#92400e' })
+          frontForeG.circle(0, foreArmH - 0.9, 0.4).fill({ color: '#fffbeb', alpha: 0.85 })
+        }
         frontFore.addChild(frontForeG)
         frontFore.addChild(frontHand)
         frontArm.addChild(frontFore)

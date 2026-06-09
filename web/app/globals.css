@@ -173,10 +173,64 @@ video {
   max-width: 100%;
   min-width: 0;
 }
+/* 紧凑状态卡：固定三段式结构，避免长 hint 把卡片撑得过高。 */
+.lqs-status-card {
+  padding: 8px 10px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lqs-status-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.lqs-status-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.lqs-status-mid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.lqs-status-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  text-align: right;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.lqs-status-hint {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 /* 趋势指标数值（与上一时间步 delta）：紧贴箭头，等宽数字。 */
 .lqs-status-delta {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 2px 6px;
   border-radius: 999px;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 8px rgba(15, 23, 42, 0.12);
@@ -192,10 +246,10 @@ video {
   background: rgba(148, 163, 184, 0.16);
 }
 .lqs-status-score {
-  align-self: end;
-  padding: 6px 12px;
-  border-radius: 14px;
-  font-size: 32px;
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 26px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -204,12 +258,12 @@ video {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 8px 18px rgba(15, 23, 42, 0.16),
+    0 6px 14px rgba(15, 23, 42, 0.14),
     0 0 0 1px rgba(255, 255, 255, 0.56);
 }
 .lqs-status-score span {
-  margin-left: 3px;
-  font-size: 14px;
+  margin-left: 2px;
+  font-size: 12px;
   font-weight: 800;
   opacity: 0.8;
 }
@@ -270,11 +324,11 @@ video {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .lqs-status-score {
-    font-size: 28px;
-    padding: 6px 10px;
+    font-size: 23px;
+    padding: 4px 8px;
   }
   .lqs-status-score span {
-    font-size: 12px;
+    font-size: 11px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
