@@ -1854,7 +1854,7 @@ function deathAgeFor(ctx: MetricsCtx): number {
 }
 
 export default function SimPage() {
-  const [age, setAge] = useState<number>(18)
+  const [age, setAge] = useState<number>(0)
   const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(true)
   const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(1)
   const animationFrameRef = useRef<number | null>(null)
@@ -1869,6 +1869,14 @@ export default function SimPage() {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      return next
+    })
+  // 仅追加（自动播放自动选卡用，避免误把已选项取消）。
+  const addDecision = (id: string) =>
+    setDecisions((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
       return next
     })
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
@@ -1911,6 +1919,11 @@ export default function SimPage() {
   useEffect(() => {
     decisionsRef.current = decisions
   }, [decisions])
+  // 自动播放标记落 ref，供发牌副作用读取（自动播放时自动随机选卡）。
+  const autoPlayRef = useRef(isTimelinePlaying)
+  useEffect(() => {
+    autoPlayRef.current = isTimelinePlaying
+  }, [isTimelinePlaying])
 
   // 某年龄当前可抽的卡池（在窗口期内、尚未选中、前置事件已满足、可排除指定 id）。
   // 垃圾卡多为无前置、窗口宽，始终在池中（不受天赋/教养影响）；链式卡需先选中前置才会出现。
@@ -1927,6 +1940,7 @@ export default function SimPage() {
     )
 
   // 年龄每过一岁 → 重新发 3 张牌、重置 2 次重随机会。人死后不再发牌（一切都结束了）。
+  // 自动播放时：发牌后自动从手牌里随机选中一张（海克斯大乱斗式自动 roll + 自动选）。
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
@@ -1935,8 +1949,13 @@ export default function SimPage() {
       setRerollsLeft(0)
       return
     }
-    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 3))
+    const dealt = sampleN(poolAt(displayAge, []).map((c) => c.id), 3)
+    setHand(dealt)
     setRerollsLeft(2)
+    if (autoPlayRef.current && dealt.length > 0) {
+      const pick = dealt[Math.floor(Math.random() * dealt.length)]
+      addDecision(pick)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayAge])
 
@@ -2070,6 +2089,28 @@ export default function SimPage() {
   const invertBg = () =>
     setFamilyBg((prev) => FAMILY_BACKGROUNDS.filter((b) => !prev.includes(b.id)).map((b) => b.id))
 
+  // 🎲 随机出身：随机出生地域 / 出身家庭 / 性别 / 个人天赋 / 教养氛围，并把人生重置到 0 岁重新开局。
+  const randomizeOrigin = () => {
+    const pickOne = <T,>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)]
+    const pickSome = <T,>(arr: readonly T[], min: number) => {
+      const shuffled = [...arr].sort(() => Math.random() - 0.5)
+      const n = min + Math.floor(Math.random() * (arr.length - min + 1))
+      return shuffled.slice(0, Math.max(min, n))
+    }
+    setRegionId(pickOne(REGIONS).id)
+    setFamilyId(pickOne(FAMILIES).id)
+    setGender(Math.random() < 0.5 ? 'male' : 'female')
+    setSelectedTalents(pickSome(TALENTS, 1).map((t) => t.id))
+    setFamilyBg(pickSome(FAMILY_BACKGROUNDS, 1).map((b) => b.id))
+    // 重新投胎：清空抉择、从 0 岁开始、自动播放重新开局。
+    setDecisions(new Set())
+    handYearRef.current = -1
+    setHand([])
+    setRerollsLeft(2)
+    setAge(0)
+    setIsTimelinePlaying(true)
+  }
+
   useEffect(() => {
     if (!isTimelinePlaying) {
       lastFrameMsRef.current = null
@@ -2089,8 +2130,8 @@ export default function SimPage() {
         // 人死了一切都结束：到达死亡年龄就停在那一刻，不再前进、不再循环。
         const dA = deathAgeRef.current
         if (next >= dA) return dA
-        if (next > 100) return 1 + ((next - 1) % 100)
-        return Math.max(1, next)
+        if (next > 100) return 100
+        return Math.max(0, next)
       })
       animationFrameRef.current = requestAnimationFrame(tick)
     }
@@ -2428,6 +2469,9 @@ export default function SimPage() {
   }, [])
 
   const visibleWindows = useMemo(() => {
+    // 所有人生窗口已统一改为抽卡机制（见下方卡牌）。这里返回空列表，旧的只读“机会成本清单”不再展示。
+    return [] as OpportunityWindow[]
+    // eslint-disable-next-line no-unreachable, react-hooks/exhaustive-deps
     const byTalent = windowDb.all.filter((w) => {
       if (selectedTalents.length === 0) return false
       if (w.talentMode === 'all') {
@@ -2513,6 +2557,25 @@ export default function SimPage() {
             alignSelf: 'start',
           }}
         >
+          <button
+            type="button"
+            onClick={randomizeOrigin}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: 'none',
+              borderRadius: 10,
+              background: 'linear-gradient(135deg,#7c3aed,#db2777)',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              boxShadow: '0 2px 8px rgba(124,58,237,0.3)',
+            }}
+          >
+            🎲 随机投胎（随机出身 + 从 0 岁开局）
+          </button>
           <div className="lqs-aside-section">
             <div style={{ fontWeight: 600, marginBottom: 8 }}>出生地域</div>
             <select
@@ -2909,7 +2972,7 @@ export default function SimPage() {
             </div>
             <input
               type="range"
-              min={1}
+              min={0}
               max={100}
               step={0.1}
               value={age}
@@ -3190,15 +3253,12 @@ export default function SimPage() {
                 id="opportunity-cost-heading"
                 style={{ fontSize: 18, margin: 0 }}
               >
-                当前阶段即将错过的人生窗口 · 机会成本 · 感情线 ∥ 事业线
+                人生抽卡 · 每岁三选一 · 感情线 ∥ 事业线
               </h2>
               <p style={{ margin: 0, color: '#6b7280', fontSize: 13, lineHeight: 1.7 }}>
-                以当前年龄 <strong>{displayAge} 岁</strong> 为参考点，按"个人天赋"筛选<strong>未来10年</strong>内最该抓住的机会窗口：
-                <span style={{ color: '#b91c1c', fontWeight: 600 }}> 即将错过</span>、
-                <span style={{ color: '#047857' }}> 当前可选</span>、
-                <span style={{ color: '#1d4ed8' }}> 即将到来</span>、
-                <span style={{ color: '#6b7280' }}> 刚刚错过</span>。
-                "即将到来"仅展示<strong>未来10年</strong>内可触达的窗口；更远的窗口不在当前关注列表。“刚刚错过”仅列出过去<strong>5 年</strong>内刚关闭的窗口，错过太久的默认隐藏；可在筛选区切换“显示全部已错过”查看长期机会成本回顾。
+                以当前年龄 <strong>{displayAge} 岁</strong> 为节点，每岁随机发 3 张人生卡牌（感情线 / 事业线），
+                <strong>三选一</strong>抓住当下的机会窗口；每年有 <strong>2 次重随</strong>机会，
+                也可一键随机。自动播放时会替你自动随机选牌，从 0 岁一路开到人生终局。
               </p>
             </div>
 
@@ -3404,23 +3464,6 @@ export default function SimPage() {
                 </div>
               )}
 
-              {/* 显示全部已错过（天赋筛选已移至左侧操作区） */}
-              <label
-                style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={showMissed}
-                  onChange={(e) => setShowMissed(e.target.checked)}
-                />
-                下方机会成本清单：显示全部已错过（含 5 年外）
-              </label>
             </div>
 
             <ul
@@ -3432,11 +3475,6 @@ export default function SimPage() {
                 gap: 10,
               }}
             >
-              {visibleWindows.length === 0 && (
-                <li style={{ color: '#6b7280', fontSize: 13, padding: 12 }}>
-                  当前筛选（天赋 / 地域 / 教养氛围）下没有命中的窗口；尝试放宽筛选条件。
-                </li>
-              )}
               {visibleWindows.map((win) => {
                 const status = classifyWindow(age, win)
                 // 刚错过（阈值内）vs 错过太久：在 missed 详情里区分。
