@@ -1855,10 +1855,13 @@ function deathAgeFor(ctx: MetricsCtx): number {
 
 export default function SimPage() {
   const [age, setAge] = useState<number>(0)
-  const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(true)
+  // 选项驱动：isTimelinePlaying = 自动模式（定时随机替你选一张牌并进入下一年）。
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(false)
   const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(1)
-  const animationFrameRef = useRef<number | null>(null)
-  const lastFrameMsRef = useRef<number | null>(null)
+  // 无有效选择（0 或 1 张牌）时的提示文案；非空即弹出“只能选默认”横幅。
+  const [defaultNotice, setDefaultNotice] = useState<string | null>(null)
+  // 防止一次推进过程中重复推进（手动选牌 500ms 内只推进一次）。
+  const advancingRef = useRef(false)
   const [regionId, setRegionId] = useState<RegionId>(REGIONS[1].id)
   const [familyId, setFamilyId] = useState<string>(FAMILIES[1].id)
   const [gender, setGender] = useState<'male' | 'female'>('male')
@@ -1871,7 +1874,7 @@ export default function SimPage() {
       else next.add(id)
       return next
     })
-  // 仅追加（自动播放自动选卡用，避免误把已选项取消）。
+  // 仅追加（自动选卡 / 选牌用，避免误把已选项取消）。
   const addDecision = (id: string) =>
     setDecisions((prev) => {
       if (prev.has(id)) return prev
@@ -1879,6 +1882,27 @@ export default function SimPage() {
       next.add(id)
       return next
     })
+  // 选项驱动推进：每做一次选择 → 进入下一年；死亡年龄即终局，不再前进。
+  const advanceYear = () => {
+    setAge((a) => {
+      const next = Math.floor(a) + 1
+      const dA = deathAgeRef.current
+      if (next >= dA) return dA
+      if (next > 100) return 100
+      return next
+    })
+  }
+  // 手动选牌：记下抉择并在 0.5s 后进入下一年（给一点“已选中”反馈再翻页）。
+  const pickCard = (id: string) => {
+    if (advancingRef.current) return
+    if (decisionsRef.current.has(id)) return
+    advancingRef.current = true
+    addDecision(id)
+    window.setTimeout(() => {
+      advanceYear()
+      advancingRef.current = false
+    }, 500)
+  }
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
     TALENTS.map((t) => t.id)
   )
@@ -1919,11 +1943,6 @@ export default function SimPage() {
   useEffect(() => {
     decisionsRef.current = decisions
   }, [decisions])
-  // 自动播放标记落 ref，供发牌副作用读取（自动播放时自动随机选卡）。
-  const autoPlayRef = useRef(isTimelinePlaying)
-  useEffect(() => {
-    autoPlayRef.current = isTimelinePlaying
-  }, [isTimelinePlaying])
 
   // 某年龄当前可抽的卡池（在窗口期内、尚未选中、前置事件已满足、可排除指定 id）。
   // 垃圾卡多为无前置、窗口宽，始终在池中（不受天赋/教养影响）；链式卡需先选中前置才会出现。
@@ -1939,8 +1958,7 @@ export default function SimPage() {
         reqMet(c),
     )
 
-  // 年龄每过一岁 → 重新发 3 张牌、重置 2 次重随机会。人死后不再发牌（一切都结束了）。
-  // 自动播放时：发牌后自动从手牌里随机选中一张（海克斯大乱斗式自动 roll + 自动选）。
+  // 进入新的一年 → 重新发 3 张牌、重置 2 次重随机会。人死后不再发牌。
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
@@ -1949,13 +1967,8 @@ export default function SimPage() {
       setRerollsLeft(0)
       return
     }
-    const dealt = sampleN(poolAt(displayAge, []).map((c) => c.id), 3)
-    setHand(dealt)
+    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 3))
     setRerollsLeft(2)
-    if (autoPlayRef.current && dealt.length > 0) {
-      const pick = dealt[Math.floor(Math.random() * dealt.length)]
-      addDecision(pick)
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayAge])
 
@@ -1968,12 +1981,12 @@ export default function SimPage() {
     setRerollsLeft((n) => n - 1)
   }
 
-  // 一键随机：从当前手牌里随机抽一张尚未选中的，直接选中。
+  // 一键随机：从当前手牌里随机抽一张尚未选中的，选中并进入下一年。
   const oneClickRandom = () => {
     const candidates = hand.filter((id) => !decisions.has(id))
     if (candidates.length === 0) return
     const pick = candidates[Math.floor(Math.random() * candidates.length)]
-    toggleDecision(pick)
+    pickCard(pick)
   }
 
   // 单张卡牌渲染（抽卡手牌 + 开发"全部卡池"两处共用）。
@@ -1982,7 +1995,7 @@ export default function SimPage() {
       ? { color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' }
       : { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' }
 
-  const renderChoiceCard = (c: LifeChoice) => {
+  const renderChoiceCard = (c: LifeChoice, onPick?: (id: string) => void) => {
     const col = cardPalette(c.track)
     const inWindow = age >= c.ageStart && age <= c.ageEnd
     const selected = decisions.has(c.id)
@@ -2011,7 +2024,7 @@ export default function SimPage() {
         key={c.id}
         type="button"
         disabled={locked}
-        onClick={() => toggleDecision(c.id)}
+        onClick={() => (onPick ?? toggleDecision)(c.id)}
         aria-pressed={selected}
         title={c.desc}
         style={{
@@ -2111,47 +2124,16 @@ export default function SimPage() {
     setIsTimelinePlaying(true)
   }
 
-  useEffect(() => {
-    if (!isTimelinePlaying) {
-      lastFrameMsRef.current = null
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-      return
-    }
-
-    const tick = (now: number) => {
-      const last = lastFrameMsRef.current ?? now
-      const elapsed = Math.min(now - last, 250)
-      lastFrameMsRef.current = now
-      setAge((prev) => {
-        const next = prev + (elapsed / BASE_MS_PER_YEAR) * timelineSpeed
-        // 人死了一切都结束：到达死亡年龄就停在那一刻，不再前进、不再循环。
-        const dA = deathAgeRef.current
-        if (next >= dA) return dA
-        if (next > 100) return 100
-        return Math.max(0, next)
-      })
-      animationFrameRef.current = requestAnimationFrame(tick)
-    }
-
-    animationFrameRef.current = requestAnimationFrame(tick)
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-      lastFrameMsRef.current = null
-    }
-  }, [isTimelinePlaying, timelineSpeed])
-
   const pauseTimeline = () => setIsTimelinePlaying(false)
   const resumeTimeline = () => setIsTimelinePlaying(true)
   const resetTimeline = () => {
-    lastFrameMsRef.current = null
-    setAge(1)
     setIsTimelinePlaying(false)
+    setDefaultNotice(null)
+    setDecisions(new Set())
+    handYearRef.current = -1
+    setHand([])
+    setRerollsLeft(2)
+    setAge(0)
   }
 
   // 根据“教养氛围”多选过滤出“出身家庭”可选项。未选任何氛围时，退回全部。
@@ -2251,6 +2233,41 @@ export default function SimPage() {
   const isDead = age >= deathAge
   const metricAge = Math.min(age, deathAge)
 
+  // —— 自动模式：定时随机替玩家选一张牌并进入下一年（选项驱动的自动版）——
+  useEffect(() => {
+    if (!isTimelinePlaying || isDead) return
+    const ms = BASE_MS_PER_YEAR / timelineSpeed
+    const timer = window.setTimeout(() => {
+      const candidates = hand.filter((id) => !decisionsRef.current.has(id))
+      if (candidates.length > 0) {
+        addDecision(candidates[Math.floor(Math.random() * candidates.length)])
+      }
+      advanceYear()
+    }, ms)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimelinePlaying, isDead, timelineSpeed, hand, age])
+
+  // —— 手动模式 + 无有效选择（0 或 1 张牌）：弹"只能选默认"提示，3 秒后自动进入下一年 ——
+  useEffect(() => {
+    if (isTimelinePlaying || isDead || hand.length >= 2) {
+      setDefaultNotice(null)
+      return
+    }
+    setDefaultNotice(
+      hand.length === 1
+        ? '本年只有一个选项，只能接受默认选择 · 3 秒后自动进入下一年…'
+        : '本年没有可抉择的机会，只能随波逐流 · 3 秒后自动进入下一年…',
+    )
+    const timer = window.setTimeout(() => {
+      if (hand.length === 1) addDecision(hand[0])
+      setDefaultNotice(null)
+      advanceYear()
+    }, 3000)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimelinePlaying, isDead, hand])
+
   // 当前年龄、已叠加抉择 cost/gain 的四维分（状态卡显示用；死后冻结在死亡年龄）。
   const liveMetrics = metricsAt(metricAge, metricsCtx)
   const wealthScore = fmt1(liveMetrics.wealth)
@@ -2286,6 +2303,44 @@ export default function SimPage() {
     // area 最大 = 100 * 100 = 10000；归一化到 0~100。
     return fmt1((area / 10000) * 100)
   }, [happinessSeries, deathAge])
+
+  // 四象限（成长 / 教育 / 职业 / 心理变化）——由当下四维分值 + 已选抉择动态生成，而非静态阶段文案。
+  const quadrantCards = useMemo(() => {
+    const a = metricAge
+    const moodNow = happinessSeries[Math.min(Math.round(a), 100)] ?? 0
+    const chosen = choiceIds.map((id) => CHOICE_BY_ID.get(id)).filter(Boolean) as LifeChoice[]
+    const careerPicks = chosen.filter((c) => c.track === 'career').map((c) => c.name)
+    const lovePicks = chosen.filter((c) => c.track === 'love').map((c) => c.name)
+    const band = (v: number, hi: number, mid: number) => (v >= hi ? 'high' : v >= mid ? 'mid' : 'low')
+    // 成长（身体）
+    const bb = band(bodyScore, 70, 40)
+    const growth =
+      `身体机能 ${fmt1(bodyScore)} 分（${a < 13 ? '发育期' : a < 25 ? '巅峰期' : a < 45 ? '缓降期' : a < 65 ? '中年下滑' : '老年衰退'}）。` +
+      (bb === 'high' ? '精力充沛、恢复快，是折腾的本钱。' : bb === 'mid' ? '机能尚可，开始需要规律作息与锻炼来托底。' : '体能透支、慢病风险升高，健康成了最大变量。')
+    // 教育
+    const eb = band(educationScore, 70, 40)
+    const eduStage = a < 7 ? '学前' : a < 13 ? '小学' : a < 16 ? '初中' : a < 19 ? '高中' : a < 23 ? '大学' : '社会大学'
+    const education =
+      `学历 ${fmt1(educationScore)} 分（${eduStage}）。` +
+      (eb === 'high' ? '知识与文凭双高，认知带宽与上升通道都更宽。' : eb === 'mid' ? '基础扎实，差一步关键学历/技能就能撬动更高平台。' : '学历偏低，很多门票还没拿到，机会被悄悄筛掉。')
+    // 职业（资产 + 已选事业线抉择）
+    const wb = band(wealthScore, 200, 80)
+    const career =
+      (careerPicks.length ? `事业线足迹：${careerPicks.slice(-3).join('、')}。` : '还没做出任何事业线抉择，方向待定。') +
+      ` 当前资产 ${fmt1(wealthScore)} 万，${wb === 'high' ? '已有可观积累与抗风险垫子。' : wb === 'mid' ? '处在原始积累爬坡期。' : '现金流吃紧，选择空间被钱限制。'}`
+    // 心理变化（多巴胺 + 感情线抉择）
+    const mb = band(moodNow, 70, 45)
+    const psychology =
+      `当下多巴胺 ${fmt1(moodNow)} 分。` +
+      (mb === 'high' ? '心气足、内在丰盈，做事有正反馈。' : mb === 'mid' ? '情绪平稳偶有波动，谈不上痛苦也谈不上酣畅。' : '长期低迷、内耗严重，心理风险已能影响寿命。') +
+      (lovePicks.length ? ` 感情线：${lovePicks.slice(-2).join('、')}。` : ' 还没有一段感情线抉择，情感账户空着。')
+    return [
+      { title: '成长', value: growth },
+      { title: '教育', value: education },
+      { title: '职业', value: career },
+      { title: '心理变化', value: psychology },
+    ]
+  }, [metricAge, bodyScore, educationScore, wealthScore, happinessSeries, choiceIds])
 
   // 缓存上一时间步分值，用于计算 delta。初次渲染 delta = 0 / trend = 'flat'。
   const prevScoresRef = useRef<{ wealth: number; identity: number; education: number; body: number } | null>(null)
@@ -2974,21 +3029,21 @@ export default function SimPage() {
               type="range"
               min={0}
               max={100}
-              step={0.1}
+              step={1}
               value={age}
               onChange={(e) => {
                 setIsTimelinePlaying(false)
-                setAge(Number(e.target.value))
+                setAge(Math.round(Number(e.target.value)))
               }}
               style={{ width: '100%' }}
               aria-label="年龄滑块"
             />
-            <div className="lqs-playback-controls" aria-label="时间轴自动播放控制">
+            <div className="lqs-playback-controls" aria-label="选项驱动 / 自动控制">
               <button type="button" onClick={isTimelinePlaying ? pauseTimeline : resumeTimeline}>
-                {isTimelinePlaying ? '暂停' : '继续'}
+                {isTimelinePlaying ? '⏸ 暂停自动' : '▶ 自动随机'}
               </button>
-              <button type="button" onClick={resetTimeline}>重置</button>
-              <span className="lqs-playback-label">5 秒/岁</span>
+              <button type="button" onClick={resetTimeline}>↺ 重开一生</button>
+              <span className="lqs-playback-label">自动 {fmt1(5 / timelineSpeed)} 秒/年</span>
               <div className="lqs-playback-speeds" role="group" aria-label="播放倍速">
                 {PLAYBACK_SPEEDS.map((speed) => (
                   <button
@@ -3084,12 +3139,7 @@ export default function SimPage() {
               gap: 12,
             }}
           >
-            {[
-              { title: '成长', value: stage.growth },
-              { title: '教育', value: stage.education },
-              { title: '职业', value: stage.career },
-              { title: '心理变化', value: stage.psychology },
-            ].map((card) => (
+            {quadrantCards.map((card) => (
               <div
                 key={card.title}
                 className="lqs-card"
@@ -3360,6 +3410,25 @@ export default function SimPage() {
                   </div>
                 </div>
 
+                {defaultNotice && (
+                  <div
+                    style={{
+                      border: '1px solid #fde68a',
+                      background: '#fffbeb',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      color: '#92400e',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span>⏳</span>
+                    <span>{defaultNotice}</span>
+                  </div>
+                )}
+
                 {hand.length === 0 ? (
                   <div style={{ fontSize: 12, color: '#9ca3af', padding: '8px 0' }}>
                     {isDead
@@ -3382,7 +3451,7 @@ export default function SimPage() {
                       const selected = decisions.has(id)
                       return (
                         <div key={`${id}-${i}`} style={{ display: 'grid', gap: 6 }}>
-                          {renderChoiceCard(c)}
+                          {renderChoiceCard(c, pickCard)}
                           <button
                             type="button"
                             onClick={() => rerollCard(i)}
