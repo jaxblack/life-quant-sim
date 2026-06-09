@@ -23,6 +23,8 @@ type Props = {
   happiness?: number[]
   /** 人生意义总分（曲线下归一化面积 0~100），走到坟墓时展示。 */
   lifeMeaning?: number
+  /** 死亡年龄（指标差会提前离世）；小人走到此处立碑停步，曲线到此为止。 */
+  deathAge?: number
   /** 无障碍描述，挂在容器上。 */
   ariaLabel?: string
 }
@@ -30,7 +32,7 @@ type Props = {
 // 把 0..1 的明暗叠加到一个 Graphics 上的小工具：用低透明度白/黑罩出高光与暗面。
 // （Pixi v8 也有 FillGradient，但分层平涂更可控、跨版本更稳。）
 
-export default function PixiCharacter({ a, progress, tier, happiness, lifeMeaning, ariaLabel }: Props) {
+export default function PixiCharacter({ a, progress, tier, happiness, lifeMeaning, deathAge, ariaLabel }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // Pixi 运行期对象（动态加载，统一用 any 规避命名空间类型摩擦）。
   const appRef = useRef<any>(null)
@@ -40,6 +42,7 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
   const progressRef = useRef(progress)
   const happinessRef = useRef<number[]>(happiness ?? [])
   const lifeMeaningRef = useRef<number>(lifeMeaning ?? 0)
+  const deathAgeRef = useRef<number>(deathAge ?? 100)
   const animRef = useRef({ t: 0, dir: 1, x: 0 })
   const reducedRef = useRef(false)
   const destroyedRef = useRef(false)
@@ -60,9 +63,10 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
   useEffect(() => {
     happinessRef.current = happiness ?? []
     lifeMeaningRef.current = lifeMeaning ?? 0
+    deathAgeRef.current = deathAge ?? 100
     const layers = layersRef.current
     if (layers && typeof layers.drawScene === 'function') layers.drawScene()
-  }, [happiness, lifeMeaning])
+  }, [happiness, lifeMeaning, deathAge])
 
   useEffect(() => {
     let cancelled = false
@@ -106,6 +110,12 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
       // ---- 图层结构 ----
       const stage = app.stage
       const curve = new PIXI.Graphics() // 背景：快乐曲线 + 人生意义面积
+      const axis = new PIXI.Graphics() // 多巴胺纵轴
+      const axisLabel = new PIXI.Text({
+        text: '多巴胺',
+        style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fill: '#94a3b8', fontWeight: '600' },
+      })
+      axisLabel.rotation = -Math.PI / 2 // 竖排
       const grave = new PIXI.Graphics() // 终点：墓碑（age 100）
       const meaningText = new PIXI.Text({
         text: '',
@@ -119,6 +129,8 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
       const footDust = new PIXI.Container() // 落脚扬尘（世界坐标，不随 walker 翻面）
       const figure = new PIXI.Container() // 人物本体（站在 walker 原点 = 脚底）
       walker.addChild(figure)
+      stage.addChild(axis)
+      stage.addChild(axisLabel)
       stage.addChild(curve)
       stage.addChild(dust)
       stage.addChild(shadow)
@@ -127,7 +139,7 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
       stage.addChild(walker)
       stage.addChild(meaningText)
 
-      layersRef.current = { curve, grave, meaningText, dust, shadow, walker, footDust, figure, PIXI }
+      layersRef.current = { curve, axis, axisLabel, grave, meaningText, dust, shadow, walker, footDust, figure, PIXI }
 
       // 漂浮尘埃初始化。
       const motes: any[] = []
@@ -500,19 +512,27 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
       let leftX = 24
       let rightX = W - 24
       // 把人生进度(0..1)映射成横向位置：0=最左(出生)，1=最右(终点)。小人始终朝右行走。
+      // 若在 deathAge 之前离世，进度被钳制在死亡点（小人停在墓碑旁，不再前进）。
+      const deathProgress = () => {
+        const d = deathAgeRef.current ?? 100
+        return Math.max(0, Math.min(1, (d - 1) / 99))
+      }
       const applyProgress = () => {
-        const p = Math.max(0, Math.min(1, progressRef.current))
+        const p = Math.min(Math.max(0, Math.min(1, progressRef.current)), deathProgress())
         const span = Math.max(0, rightX - leftX)
         walker.x = leftX + p * span
         walker.scale.x = 1
         shadow.x = walker.x
         drawScene()
       }
-      // 背景快乐曲线 + 人生意义面积 + 终点墓碑。
+      // 背景多巴胺曲线（边走边画）+ 人生意义面积 + 死亡处墓碑 + 纵轴标注。
       const drawScene = () => {
         const hap = happinessRef.current
         const span = Math.max(0, rightX - leftX)
-        const p = Math.max(0, Math.min(1, progressRef.current))
+        const dAge = deathAgeRef.current ?? 100
+        const pRaw = Math.max(0, Math.min(1, progressRef.current))
+        // 当前年龄（按进度换算回 1..100），但不超过死亡年龄。
+        const curAge = Math.min(dAge, 1 + pRaw * 99)
         // 曲线绘制区：底部留给小人脚下地面，顶部留白。
         const curveBottom = groundY - 2
         const curveTop = Math.max(8, H * 0.16)
@@ -520,45 +540,48 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
         const xAt = (ageIdx: number) => leftX + (ageIdx / 100) * span
         const yAt = (h: number) => curveBottom - (Math.max(0, Math.min(100, h)) / 100) * curveH
 
-        curve.clear()
-        if (hap.length >= 2) {
-          // 1) 完整曲线下方淡填充（未来部分，浅灰）。
-          curve.moveTo(xAt(0), curveBottom)
-          for (let i = 0; i < hap.length; i++) curve.lineTo(xAt(i), yAt(hap[i]))
-          curve.lineTo(xAt(hap.length - 1), curveBottom)
-          curve.closePath()
-          curve.fill({ color: '#cbd5e1', alpha: 0.18 })
+        // ---- 纵轴：多巴胺 ----
+        axis.clear()
+        axis.moveTo(leftX, curveTop).lineTo(leftX, curveBottom).stroke({ width: 1, color: '#cbd5e1', alpha: 0.8 })
+        // 轴顶小箭头
+        axis.moveTo(leftX, curveTop).lineTo(leftX - 3, curveTop + 5).moveTo(leftX, curveTop).lineTo(leftX + 3, curveTop + 5).stroke({ width: 1, color: '#cbd5e1', alpha: 0.8 })
+        axisLabel.x = leftX - 4
+        axisLabel.y = curveTop + (curveBottom - curveTop) / 2 + axisLabel.width / 2
 
-          // 2) 已走过部分（age ≤ 当前）高亮填充 = 已积累的人生意义。
-          const curIdx = Math.max(0, Math.min(100, p * 100))
-          const lastWhole = Math.floor(curIdx)
+        // ---- 多巴胺曲线：只画"已走过"的部分（边走边画，起点不预先铺满）----
+        curve.clear()
+        if (hap.length >= 2 && curAge > 0) {
+          const lastWhole = Math.floor(Math.min(curAge, hap.length - 1))
+          // 当前点（在两个整数年龄之间插值，让边缘精确跟随小人）。
+          const frac = curAge - lastWhole
+          const hInterp =
+            lastWhole < hap.length - 1 ? hap[lastWhole] + (hap[lastWhole + 1] - hap[lastWhole]) * frac : hap[lastWhole]
+
+          // 1) 已走过部分的面积填充 = 已积累的人生意义。
           curve.moveTo(xAt(0), curveBottom)
           for (let i = 0; i <= lastWhole; i++) curve.lineTo(xAt(i), yAt(hap[i]))
-          // 在当前 x 处插值收尾，让填充边缘精确跟随小人。
-          if (lastWhole < hap.length - 1) {
-            const frac = curIdx - lastWhole
-            const hInterp = hap[lastWhole] + (hap[lastWhole + 1] - hap[lastWhole]) * frac
-            curve.lineTo(xAt(curIdx), yAt(hInterp))
-          }
-          curve.lineTo(xAt(curIdx), curveBottom)
+          curve.lineTo(xAt(curAge), yAt(hInterp))
+          curve.lineTo(xAt(curAge), curveBottom)
           curve.closePath()
           curve.fill({ color: '#f59e0b', alpha: 0.22 })
 
-          // 3) 曲线描边（整条），已走过部分更浓。
-          curve.moveTo(xAt(0), yAt(hap[0]))
-          for (let i = 1; i < hap.length; i++) curve.lineTo(xAt(i), yAt(hap[i]))
-          curve.stroke({ width: 1.5, color: '#94a3b8', alpha: 0.55 })
+          // 2) 曲线描边（已走过部分）。
           curve.moveTo(xAt(0), yAt(hap[0]))
           for (let i = 1; i <= lastWhole; i++) curve.lineTo(xAt(i), yAt(hap[i]))
+          curve.lineTo(xAt(curAge), yAt(hInterp))
           curve.stroke({ width: 2, color: '#d97706', alpha: 0.9 })
+
+          // 3) 曲线头部一个小圆点（当前多巴胺水平）。
+          curve.circle(xAt(curAge), yAt(hInterp), 2.4).fill('#d97706')
         }
 
-        // 终点墓碑：临近 / 到达 100 岁时出现在最右端。
+        // ---- 死亡处墓碑：走到 deathAge 即立碑 ----
         grave.clear()
-        if (p >= 0.985) {
+        const reachedDeath = curAge >= dAge - 0.01
+        if (reachedDeath) {
           const gw = Math.max(14, 16 * scale)
           const gh = gw * 1.5
-          const gx = rightX - gw * 1.3 // 立在小人左侧，避免被人物完全遮挡
+          const gx = Math.min(rightX, xAt(dAge)) - gw * 0.2 // 立在死亡年龄位置
           const gy = groundY
           // 碑身
           grave.roundRect(gx - gw / 2, gy - gh, gw, gh, gw * 0.45).fill('#94a3b8').stroke({ width: 1, color: '#64748b' })
@@ -569,10 +592,8 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
           // 土堆
           grave.ellipse(gx, gy, gw * 0.9, gw * 0.28).fill('#a8a29e')
 
-          meaningText.visible = true
-          meaningText.text = `人生意义 ${lifeMeaningRef.current.toFixed(1)}`
-          meaningText.x = Math.min(W - meaningText.width - 4, Math.max(4, gx - meaningText.width / 2))
-          meaningText.y = Math.max(4, gy - gh - 16)
+          // 享年 / 人生意义信息由外层 HTML caption 展示，画布内不再重复文字，避免遮挡人物。
+          meaningText.visible = false
         } else {
           meaningText.visible = false
         }
@@ -620,6 +641,40 @@ export default function PixiCharacter({ a, progress, tier, happiness, lifeMeanin
 
         // 横向位置：跟随人生进度(0..1)沿时间轴前进，始终朝右，不再往返踱步。
         applyProgress()
+
+        // 已离世：停步定格（腿不再摆动，软投影画一次静态），跳过其余步态逻辑。
+        const dAge = deathAgeRef.current ?? 100
+        const curAge = 1 + Math.max(0, Math.min(1, progressRef.current)) * 99
+        if (curAge >= dAge - 0.01) {
+          if (limbs.backLeg) {
+            limbs.backLeg.rotation = 0
+            limbs.frontLeg.rotation = 0
+            limbs.backShin.rotation = 0
+            limbs.frontShin.rotation = 0
+            limbs.backArm.rotation = 0
+            limbs.frontArm.rotation = 0
+            limbs.backFore.rotation = 0
+            limbs.frontFore.rotation = 0
+          }
+          figure.y = groundY
+          shadow.clear()
+          const shWd = geom.headR * 2.2 * scale
+          shadow.ellipse(0, 0, shWd * 0.5, shWd * 0.16).fill({ color: '#0f172a', alpha: 0.34 })
+          shadow.x = walker.x
+          shadow.y = groundY + 2
+          // 漂浮尘埃仍缓慢飘动，维持画面呼吸感。
+          for (const m of motes) {
+            m.g.x += m.vx * dt
+            m.g.y += m.vy * dt
+            if (m.g.y < -4) {
+              m.g.y = H * 0.85
+              m.g.x = Math.random() * W
+            }
+            if (m.g.x < -4) m.g.x = W + 4
+            if (m.g.x > W + 4) m.g.x = -4
+          }
+          return
+        }
 
         // 步态相位。
         const stepW = (Math.PI * 2) / Math.max(0.2, ap.bobSpeedSec)

@@ -143,19 +143,22 @@ const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f
 // 走路 / 成长动画改由 PixiJS (WebGL) 渲染，见 components/PixiCharacter。
 
 // 阶段角色舞台: 背景 / 地面用 CSS 渲染, 人物走路 / 成长动画交给 WebGL (PixiCharacter).
-function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId, happiness, lifeMeaning }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string; happiness: number[]; lifeMeaning: number }) {
+function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId, happiness, lifeMeaning, deathAge }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string; happiness: number[]; lifeMeaning: number; deathAge: number }) {
   const a = appearanceForStageId(stageId)
   const tier = wealthTierForFamilyId(familyId)
   // 姿态补助 class: stooped 高龄、bouncy 童年。 leaning-fwd / upright 不额外加 class.
   const poseClass =
     a.posture === 'stooped' ? 'lqs-pose-stooped' :
     a.posture === 'bouncy'  ? 'lqs-pose-bouncy'  : ''
+  const dead = age >= deathAge
   return (
     <div
       className={`lqs-character-stage lqs-stage-transition ${poseClass}`}
       key={stageId}
     >
-      <div className="lqs-character-caption">{age} 岁 · {stageName} · {a.caption}</div>
+      <div className="lqs-character-caption">
+        {dead ? `享年 ${Math.round(deathAge)} 岁 · 人生意义 ${lifeMeaning.toFixed(1)}` : `${age} 岁 · ${stageName} · ${a.caption}`}
+      </div>
       <div className="lqs-character-ground" />
       <PixiCharacter
         a={a}
@@ -163,6 +166,7 @@ function CharacterStage({ stageId, age, progress, stageName, regionName, familyN
         tier={tier}
         happiness={happiness}
         lifeMeaning={lifeMeaning}
+        deathAge={deathAge}
         ariaLabel={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人沿时间轴行走动画: ${a.caption}`}
       />
     </div>
@@ -1209,17 +1213,145 @@ function wealthNorm(wealthWan: number): number {
   return Math.max(0, Math.min(100, n))
 }
 
-// 快乐程度（0..100）：自设权重——身体 0.30、身份 0.25、资产(归一化) 0.25、学历 0.20。
-function happinessAt(
-  age: number,
-  ctx: { familyId: string; regionBase: number; gender: 'male' | 'female'; bg: FamilyBgEffect },
-): number {
-  const w = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth)
-  const i = identityScoreAt(age, ctx.regionBase, ctx.bg.identity)
-  const e = educationScoreAt(age, ctx.bg.education)
-  const b = bodyScoreAt(age, ctx.bg.body, ctx.gender)
-  const h = 0.3 * b + 0.25 * i + 0.25 * wealthNorm(w) + 0.2 * e
+// ----------------------- 人生诱惑 / 垃圾选项（让模拟变成游戏）-----------------------
+// 选了"爽一时"的诱惑会拉高短期多巴胺，但侵蚀资产 / 身体 / 学历 / 身份，
+// 多个叠加会把指标拖垮 → 中年提前领便当。后果文案带点黑色幽默。
+type LifeDebuff = {
+  wealthMul: number // 资产乘子（< 1 表示缩水）
+  bodyDelta: number // 身体机能加成（多为负）
+  eduDelta: number // 学历加成（荒废为负）
+  identityDelta: number // 社会身份加成（多为负）
+  dopamineDelta: number // 多巴胺直给（诱惑爽感，多为正）
+}
+const NO_DEBUFF: LifeDebuff = { wealthMul: 1, bodyDelta: 0, eduDelta: 0, identityDelta: 0, dopamineDelta: 0 }
+
+type Vice = {
+  id: string
+  emoji: string
+  name: string
+  desc: string // 玩法描述
+  consequence: string // 后果（黑色幽默）
+  effects: Partial<LifeDebuff>
+}
+const VICES: Vice[] = [
+  {
+    id: 'idle',
+    emoji: '🛋️',
+    name: '无所事事',
+    desc: '一天天躺着刷手机，时间在指缝里溜走',
+    consequence: '技能荒废、简历空窗、资产缩水，HR 已读不回。',
+    effects: { wealthMul: 0.5, eduDelta: -16, identityDelta: -12, dopamineDelta: 4 },
+  },
+  {
+    id: 'gaming',
+    emoji: '🎮',
+    name: '游戏人生',
+    desc: '沉迷游戏，立志冲上国服第一',
+    consequence: '段位封神：最强王者·国服前 100（并无卵用）；学业事业双双荒废。',
+    effects: { wealthMul: 0.45, eduDelta: -22, bodyDelta: -8, identityDelta: -6, dopamineDelta: 9 },
+  },
+  {
+    id: 'travel',
+    emoji: '🌍',
+    name: '环球旅行',
+    desc: '说走就走，背包环游世界两三年',
+    consequence: '见识 +++、存款 ---、简历出现大段空窗，回国后从零开始。',
+    effects: { wealthMul: 0.4, identityDelta: -4, eduDelta: 3, dopamineDelta: 13 },
+  },
+  {
+    id: 'gap',
+    emoji: '🏝️',
+    name: 'Gap 一阵子',
+    desc: '裸辞 gap，去寻找诗和远方与自己',
+    consequence: '短期巨爽，长期错过晋升窗口与复利，回归赛道时已被后浪拍在沙滩。',
+    effects: { wealthMul: 0.7, identityDelta: -6, dopamineDelta: 7 },
+  },
+  {
+    id: 'lieflat',
+    emoji: '😪',
+    name: '躺平摆烂',
+    desc: '不卷了，开启最低欲望生存模式',
+    consequence: '压力 --，但收入封顶、身材走样、社会存在感稀薄。',
+    effects: { wealthMul: 0.55, bodyDelta: -5, identityDelta: -8, dopamineDelta: 6 },
+  },
+  {
+    id: 'gacha',
+    emoji: '💸',
+    name: '氪金抽卡',
+    desc: '为爱发电，月月 648，仓库全满级',
+    consequence: '账号金光闪闪、钱包空空如也；版本更新后角色一夜归零。',
+    effects: { wealthMul: 0.5, dopamineDelta: 8 },
+  },
+]
+
+// 把多个诱惑叠加成一个总 debuff（乘子相乘、加成相加）。
+function combineVices(ids: Iterable<string>): LifeDebuff {
+  const d: LifeDebuff = { ...NO_DEBUFF }
+  Array.from(ids).forEach((id) => {
+    const v = VICES.find((x) => x.id === id)
+    if (!v) return
+    const e = v.effects
+    if (e.wealthMul != null) d.wealthMul *= e.wealthMul
+    if (e.bodyDelta != null) d.bodyDelta += e.bodyDelta
+    if (e.eduDelta != null) d.eduDelta += e.eduDelta
+    if (e.identityDelta != null) d.identityDelta += e.identityDelta
+    if (e.dopamineDelta != null) d.dopamineDelta += e.dopamineDelta
+  })
+  return d
+}
+
+type MetricsCtx = {
+  familyId: string
+  regionBase: number
+  gender: 'male' | 'female'
+  bg: FamilyBgEffect
+  debuff?: LifeDebuff
+}
+
+// 某一年龄的四维分（已叠加诱惑 debuff）。
+function metricsAt(age: number, ctx: MetricsCtx) {
+  const d = ctx.debuff ?? NO_DEBUFF
+  const wealth = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth) * d.wealthMul
+  const identity = clamp01x100(identityScoreAt(age, ctx.regionBase, ctx.bg.identity) + d.identityDelta)
+  const education = clamp01x100(educationScoreAt(age, ctx.bg.education) + d.eduDelta)
+  const body = clamp01x100(bodyScoreAt(age, ctx.bg.body, ctx.gender) + d.bodyDelta)
+  return { wealth, wealthN: wealthNorm(wealth), identity, education, body }
+}
+
+function clamp01x100(v: number): number {
+  return Math.max(0, Math.min(100, v))
+}
+
+// 多巴胺（0..100）：自设权重——身体 0.30、身份 0.25、资产(归一化) 0.25、学历 0.20，
+// 再叠加诱惑的即时爽感 dopamineDelta。
+function happinessAt(age: number, ctx: MetricsCtx): number {
+  const m = metricsAt(age, ctx)
+  const d = ctx.debuff ?? NO_DEBUFF
+  const h = 0.3 * m.body + 0.25 * m.identity + 0.25 * m.wealthN + 0.2 * m.education + d.dopamineDelta
   return Math.max(0, Math.min(100, h))
+}
+
+// 死亡年龄：累计"健康赤字 + 贫困(医疗差) + 长期低多巴胺"的风险，越过阈值即离世。
+// 指标越差（资产/身体低、诱惑叠满）死得越早；富足健康可活到 90+。
+function deathAgeFor(ctx: MetricsCtx): number {
+  let risk = 0
+  for (let y = 22; y <= 100; y++) {
+    const m = metricsAt(y, ctx)
+    const dopamine = happinessAt(y, ctx)
+    const bodyGap = Math.max(0, 55 - m.body)
+    const wealthGap = Math.max(0, 45 - m.wealthN)
+    const moodGap = Math.max(0, 30 - dopamine)
+    const protect = Math.max(0, m.wealthN - 70) * 0.0015 // 富足医疗延寿
+    risk +=
+      bodyGap * 0.0022 +
+      wealthGap * 0.0025 +
+      moodGap * 0.003 +
+      bodyGap * wealthGap * 0.00012 -
+      protect
+    risk = Math.max(0, risk)
+    if (risk >= 1) return Math.min(100, Math.max(30, y))
+  }
+  return 100
 }
 
 export default function SimPage() {
@@ -1231,6 +1363,14 @@ export default function SimPage() {
   const [regionId, setRegionId] = useState<RegionId>(REGIONS[1].id)
   const [familyId, setFamilyId] = useState<string>(FAMILIES[1].id)
   const [gender, setGender] = useState<'male' | 'female'>('male')
+  const [vices, setVices] = useState<Set<string>>(new Set())
+  const toggleVice = (id: string) =>
+    setVices((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
     TALENTS.map((t) => t.id)
   )
@@ -1387,30 +1527,41 @@ export default function SimPage() {
   //   身份 identity: 分（地域基础分 + 年龄阶段红利，0~100）
   //   学历 education: 分（受教育年限 + 上限封顶，0~100）
   //   身体 body: 分（婴幼儿爬升 → 25 岁前后峰值 → 老年衰退，0~100）
-  const wealthScore = wealthScoreAt(age, familyId, bgEffect.wealth)
-  const identityScore = identityScoreAt(age, REGION_IDENTITY_BASE[regionId], bgEffect.identity)
-  const educationScore = educationScoreAt(age, bgEffect.education)
-  const bodyScore = bodyScoreAt(age, bgEffect.body, gender)
+  // 诱惑叠加成总 debuff，并构造统一的指标上下文（状态卡 / 多巴胺曲线 / 死亡年龄共用）。
+  const debuff = useMemo(() => combineVices(vices), [vices])
+  const metricsCtx = useMemo<MetricsCtx>(
+    () => ({ familyId, regionBase: REGION_IDENTITY_BASE[regionId], gender, bg: bgEffect, debuff }),
+    [familyId, regionId, gender, bgEffect, debuff],
+  )
 
-  // 快乐曲线：0..100 岁逐岁的快乐程度（0~100），由四维分综合而来。
-  // 小人脚下走出的这条曲线 = 快乐程度；曲线下方围成的面积 = 人生意义。
+  // 当前年龄、已叠加诱惑 debuff 的四维分（状态卡显示用）。
+  const liveMetrics = metricsAt(age, metricsCtx)
+  const wealthScore = Math.round(liveMetrics.wealth)
+  const identityScore = liveMetrics.identity
+  const educationScore = liveMetrics.education
+  const bodyScore = liveMetrics.body
+
+  // 死亡年龄：指标越差死得越早；走到这一年就立碑收场。
+  const deathAge = useMemo(() => deathAgeFor(metricsCtx), [metricsCtx])
+
+  // 多巴胺曲线：0..100 岁逐岁（0~100），由四维分 + 诱惑爽感综合而来。
+  // 小人脚下走出的这条曲线 = 多巴胺；曲线下方围成的面积 = 人生意义。
   const happinessSeries = useMemo(() => {
-    const regionBase = REGION_IDENTITY_BASE[regionId]
-    const ctx = { familyId, regionBase, gender, bg: bgEffect }
     const arr: number[] = []
-    for (let y = 0; y <= 100; y++) arr.push(happinessAt(y, ctx))
+    for (let y = 0; y <= 100; y++) arr.push(happinessAt(y, metricsCtx))
     return arr
-  }, [regionId, familyId, gender, bgEffect])
+  }, [metricsCtx])
 
-  // 人生意义（梯形积分快乐曲线下的总面积，归一化到 0~100）。
+  // 人生意义（梯形积分多巴胺曲线下的总面积，归一化到 0~100）。
+  // 人在 deathAge 离世，之后不再积累意义。
   const lifeMeaningTotal = useMemo(() => {
     let area = 0
-    for (let i = 1; i < happinessSeries.length; i++) {
+    for (let i = 1; i <= deathAge && i < happinessSeries.length; i++) {
       area += (happinessSeries[i - 1] + happinessSeries[i]) / 2
     }
     // area 最大 = 100 * 100 = 10000；归一化到 0~100。
     return Math.round((area / 10000) * 100 * 10) / 10
-  }, [happinessSeries])
+  }, [happinessSeries, deathAge])
 
   // 缓存上一时间步分值，用于计算 delta。初次渲染 delta = 0 / trend = 'flat'。
   const prevScoresRef = useRef<{ wealth: number; identity: number; education: number; body: number } | null>(null)
@@ -1985,16 +2136,18 @@ export default function SimPage() {
             }}
           >
             {/* 人物成长 / 走路动画: 轻量 SVG + CSS, 不依赖表变 / 点击逻辑, 只读 stage 与 age。 */}
+            {/* 已离世后，人物外观 / 阶段冻结在死亡年龄，而非继续随滑块变老。 */}
             <CharacterStage
-              stageId={stage.id}
+              stageId={(age >= deathAge ? stageOfAge(deathAge) : stage).id}
               age={displayAge}
               progress={(age - 1) / 99}
-              stageName={stage.name}
+              stageName={(age >= deathAge ? stageOfAge(deathAge) : stage).name}
               regionName={region.name}
               familyName={family.name}
               familyId={familyId}
               happiness={happinessSeries}
               lifeMeaning={lifeMeaningTotal}
+              deathAge={deathAge}
             />
             <div
               style={{
@@ -2312,6 +2465,70 @@ export default function SimPage() {
                 />
                 显示全部已错过（含 5 年外）
               </label>
+            </div>
+
+            {/* 人生诱惑 · 垃圾选项（选了有后果，让模拟变成游戏） */}
+            <div
+              style={{
+                border: '1px solid #fed7aa',
+                background: 'linear-gradient(180deg,#fff7ed,#ffffff)',
+                borderRadius: 12,
+                padding: 12,
+                display: 'grid',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#9a3412' }}>🎲 人生诱惑 · 垃圾选项</span>
+                <span style={{ fontSize: 12, color: '#9a3412', opacity: 0.85 }}>
+                  点击放纵自己，爽一时但有后果——指标拖垮可能提前领便当。
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {VICES.map((v) => {
+                  const active = vices.has(v.id)
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => toggleVice(v.id)}
+                      aria-pressed={active}
+                      title={v.desc}
+                      style={{
+                        fontSize: 13,
+                        padding: '5px 12px',
+                        borderRadius: 999,
+                        border: `1px solid ${active ? '#ea580c' : '#fdba74'}`,
+                        background: active ? '#ea580c' : 'white',
+                        color: active ? 'white' : '#9a3412',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontWeight: active ? 700 : 500,
+                      }}
+                    >
+                      {v.emoji} {v.name}
+                    </button>
+                  )
+                })}
+              </div>
+              {vices.size > 0 ? (
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
+                  {VICES.filter((v) => vices.has(v.id)).map((v) => (
+                    <li key={v.id} style={{ fontSize: 12, lineHeight: 1.6, color: '#7c2d12' }}>
+                      <strong>{v.emoji} {v.name}：</strong>
+                      {v.consequence}
+                    </li>
+                  ))}
+                  <li style={{ fontSize: 12, lineHeight: 1.6, color: '#b91c1c', fontWeight: 600, listStyle: 'none', marginLeft: -18 }}>
+                    ☠️ 预计寿命：{Math.round(deathAge)} 岁
+                    {deathAge < 75 ? '（指标被拖垮，提前退场）' : deathAge >= 90 ? '（活得久，但意义如何？）' : ''}
+                  </li>
+                </ul>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, color: '#9a3412', opacity: 0.7 }}>
+                  当前规规矩矩，未选任何诱惑。预计寿命 {Math.round(deathAge)} 岁。
+                </p>
+              )}
             </div>
 
             <ul
