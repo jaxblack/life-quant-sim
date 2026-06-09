@@ -1295,6 +1295,9 @@ type LifeChoice = {
   gain: Partial<LifeDebuff> // delayYears 年后兑现的收益
   desc: string
   consequence: string // 后果文案（带黑色幽默）
+  requires?: string[] // 前置事件：必须已选中这些 id，本卡才会进入抽卡池
+  unlocks?: string[] // 后置事件：选中本卡后才会解锁的事件 id（用于链式提示）
+  extra?: Record<string, number | string | boolean> // 扩展字段（稀有度 / 标签 / 自定义参数等）
 }
 
 const LIFE_CHOICES: LifeChoice[] = [
@@ -1312,6 +1315,7 @@ const LIFE_CHOICES: LifeChoice[] = [
     ageStart: 17, ageEnd: 20, delayYears: 4, worthy: true,
     cost: { moodDelta: -10, wealthMul: 0.9 },
     gain: { eduDelta: 14, identityDelta: 12, wealthMul: 1.3, moodDelta: 5 },
+    unlocks: ['study_abroad', 'grad_school'],
     desc: '冲刺 985 / Top 名校，赌一个更高的人生起点。',
     consequence: '名校光环加身：人脉与平台跃升，代价是高压几年与社交荒漠。',
   },
@@ -1442,6 +1446,7 @@ const LIFE_CHOICES: LifeChoice[] = [
     ageStart: 18, ageEnd: 38, delayYears: 0, worthy: false,
     cost: { wealthMul: 0.9, moodDelta: -2 },
     gain: { moodDelta: 9 },
+    unlocks: ['propose', 'long_distance'],
     desc: '约会、看电影、互送礼物，谈一场恋爱。',
     consequence: '甜蜜暴击钱包：纪念日、节日、惊喜一个不落，幸福感拉满。',
   },
@@ -1450,6 +1455,7 @@ const LIFE_CHOICES: LifeChoice[] = [
     ageStart: 26, ageEnd: 42, delayYears: 1, worthy: true,
     cost: { wealthMul: 0.7, moodDelta: -5 },
     gain: { moodDelta: 10, identityDelta: 8, bodyDelta: 2 },
+    unlocks: ['divorce', 'affair'],
     desc: '领证、办婚礼，从此人生有了搭子。',
     consequence: '从单身贵族到柴米油盐：彩礼婚房掏空积蓄，但多了个并肩扛事的人。',
   },
@@ -1458,6 +1464,7 @@ const LIFE_CHOICES: LifeChoice[] = [
     ageStart: 26, ageEnd: 44, delayYears: 2, worthy: true, event: true,
     cost: { wealthMul: 0.6, bodyDelta: -6, moodDelta: -8 },
     gain: { moodDelta: 16, identityDelta: 6 },
+    unlocks: ['second_child'],
     desc: '迎接一个新生命，升级为爸 / 妈。',
     consequence: '吞金兽降临：睡眠和存款双双告急，但他第一声"爸/妈"能让你瞬间回血。',
   },
@@ -1501,6 +1508,191 @@ const LIFE_CHOICES: LifeChoice[] = [
     gain: { identityDelta: 2 },
     desc: '经历父母 / 至亲的离去（人生必修的一课）。',
     consequence: '子欲养而亲不待：巨大的情绪冲击，让人一夜长大，也更懂得珍惜眼前人。',
+  },
+  // ——————— 新增 · 少年成长链（可与"勤学苦读"组合，部分有前置） ———————
+  {
+    id: 'read_books', emoji: '📖', name: '博览群书', track: 'career',
+    ageStart: 6, ageEnd: 16, delayYears: 4, worthy: true,
+    cost: { moodDelta: -2 },
+    gain: { eduDelta: 8, identityDelta: 2, moodDelta: 3 },
+    unlocks: ['science_olympiad'],
+    desc: '泡在书海里，课外阅读量惊人。',
+    consequence: '上知天文下知地理：谈吐自带书卷气，作文素材信手拈来。',
+  },
+  {
+    id: 'learn_instrument', emoji: '🎻', name: '学门乐器', track: 'career',
+    ageStart: 6, ageEnd: 16, delayYears: 5, worthy: true,
+    cost: { wealthMul: 0.95, moodDelta: -3 },
+    gain: { identityDelta: 7, moodDelta: 5 },
+    unlocks: ['art_exam'],
+    desc: '钢琴 / 小提琴 / 吉他，考级路上不回头。',
+    consequence: '十级证书到手：多了一项体面才艺，也搭进去无数个练琴的周末。',
+  },
+  {
+    id: 'sports_team', emoji: '⚽', name: '校队主力', track: 'career',
+    ageStart: 10, ageEnd: 19, delayYears: 3, worthy: true,
+    cost: { moodDelta: -2, eduDelta: -2 },
+    gain: { bodyDelta: 12, identityDelta: 5, moodDelta: 4 },
+    desc: '校运动队主力，挥洒汗水与荷尔蒙。',
+    consequence: '身体素质拉满、校园人气爆棚；偶尔为集训耽误功课。',
+  },
+  {
+    id: 'puppy_love', emoji: '💞', name: '懵懂早恋', track: 'love',
+    ageStart: 13, ageEnd: 18, delayYears: 0, worthy: false, trash: true,
+    cost: { eduDelta: -5, moodDelta: -2 },
+    gain: { moodDelta: 9 },
+    desc: '课桌传纸条，放学一起走的青涩心动。',
+    consequence: '甜过初恋糖：成绩可能滑坡，但那份心跳多年后仍记得。',
+  },
+  {
+    id: 'science_olympiad', emoji: '🏅', name: '学科竞赛', track: 'career',
+    ageStart: 14, ageEnd: 19, delayYears: 3, worthy: true,
+    cost: { moodDelta: -6, bodyDelta: -2 },
+    gain: { eduDelta: 14, identityDelta: 10, moodDelta: 4 },
+    requires: ['read_books'],
+    desc: '搏一个省一 / 国奖，叩开保送的大门。',
+    consequence: '竞赛党的荣耀：一战封神直通名校，或陪跑三年只剩黑眼圈。',
+  },
+  {
+    id: 'art_exam', emoji: '🎨', name: '艺考特长', track: 'career',
+    ageStart: 15, ageEnd: 20, delayYears: 2, worthy: false,
+    cost: { wealthMul: 0.8, moodDelta: -5 },
+    gain: { identityDelta: 8, eduDelta: 4, moodDelta: 6 },
+    requires: ['learn_instrument'],
+    desc: '走艺术 / 体育特长生路线，另辟蹊径。',
+    consequence: '艺考独木桥：文化课压力小一些，集训烧钱、前途看天赋与运气。',
+  },
+  // ——————— 新增 · 升学深造分支（名校解锁） ———————
+  {
+    id: 'study_abroad', emoji: '✈️', name: '出国留学', track: 'career',
+    ageStart: 18, ageEnd: 28, delayYears: 4, worthy: true,
+    cost: { wealthMul: 0.45, moodDelta: -6 },
+    gain: { eduDelta: 14, identityDelta: 12, wealthMul: 1.4, moodDelta: 5 },
+    requires: ['top_university'],
+    desc: '名校加持下冲刺海外深造，开眼看世界。',
+    consequence: '镀金归来：视野与履历升级，也烧掉一套房 + 几年异乡孤独。',
+  },
+  // ——————— 新增 · 职场进阶链 ———————
+  {
+    id: 'overtime_996', emoji: '🌃', name: '996 拼搏', track: 'career',
+    ageStart: 23, ageEnd: 40, delayYears: 2, worthy: true,
+    cost: { bodyDelta: -8, moodDelta: -8 },
+    gain: { wealthMul: 1.5, identityDelta: 4, moodDelta: 2 },
+    unlocks: ['promotion'],
+    desc: '大厂高强度内卷，用健康换期权。',
+    consequence: '钱包鼓了、发际线高了：年终奖到账的快乐，体检报告的眼泪。',
+  },
+  {
+    id: 'side_hustle', emoji: '🧰', name: '副业搞钱', track: 'career',
+    ageStart: 24, ageEnd: 52, delayYears: 2, worthy: true,
+    cost: { moodDelta: -4, bodyDelta: -3 },
+    gain: { wealthMul: 1.3, moodDelta: 3 },
+    desc: '下班接单 / 摆摊 / 自媒体，开辟第二曲线。',
+    consequence: '睡后收入初体验：多一份底气，也少了不少躺平摸鱼的时光。',
+  },
+  {
+    id: 'promotion', emoji: '📊', name: '升职管理', track: 'career',
+    ageStart: 30, ageEnd: 52, delayYears: 2, worthy: true,
+    cost: { moodDelta: -5 },
+    gain: { identityDelta: 10, wealthMul: 1.4, moodDelta: 4 },
+    requires: ['overtime_996'],
+    desc: '熬出头当上管理层，手里有了兵权。',
+    consequence: '从打工人到带团队：话语权与薪资双升，背锅与开会也翻倍。',
+  },
+  {
+    id: 'buy_car', emoji: '🚗', name: '买车代步', track: 'career',
+    ageStart: 24, ageEnd: 50, delayYears: 0, worthy: false,
+    cost: { wealthMul: 0.85, moodDelta: -1 },
+    gain: { moodDelta: 6, identityDelta: 3 },
+    desc: '提一辆车，从此告别挤地铁。',
+    consequence: '有车一族真香：通勤体面、周末能远行；油费保养停车费随之而来。',
+  },
+  {
+    id: 'health_checkup', emoji: '🩺', name: '定期体检', track: 'career',
+    ageStart: 30, ageEnd: 75, delayYears: 1, worthy: true,
+    cost: { wealthMul: 0.97 },
+    gain: { bodyDelta: 6, moodDelta: 2 },
+    desc: '每年一次全身体检，早发现早安心。',
+    consequence: '把慢病掐灭在萌芽：花小钱买安心，体检前夜照样焦虑。',
+  },
+  {
+    id: 'crypto_yolo', emoji: '🪙', name: '梭哈币圈', track: 'career',
+    ageStart: 20, ageEnd: 55, delayYears: 0, worthy: false, trash: true,
+    cost: { wealthMul: 0.35, moodDelta: -2 },
+    gain: { moodDelta: 9 },
+    desc: '全仓杠杆冲山寨币，赌一夜暴富。',
+    consequence: '凌晨盯盘心跳过山车：要么财富自由，要么归零吃面，多数是后者。',
+  },
+  // ——————— 新增 · 感情进阶链（多为前置解锁） ———————
+  {
+    id: 'pet', emoji: '🐶', name: '养只宠物', track: 'love',
+    ageStart: 20, ageEnd: 65, delayYears: 1, worthy: false,
+    cost: { wealthMul: 0.95, moodDelta: -1 },
+    gain: { moodDelta: 8 },
+    desc: '领养一只猫 / 狗，从此家里有了毛孩子。',
+    consequence: '吸猫遛狗治愈一切：孤独感大降，铲屎与看病账单悄悄上涨。',
+  },
+  {
+    id: 'blind_date', emoji: '🌹', name: '相亲脱单', track: 'love',
+    ageStart: 25, ageEnd: 42, delayYears: 1, worthy: false,
+    cost: { wealthMul: 0.95, moodDelta: -2 },
+    gain: { moodDelta: 6, identityDelta: 1 },
+    desc: '父母安排，咖啡厅里高效配对。',
+    consequence: '相亲市场明码标价：条件匹配则速通领证，话不投机则尬聊两小时。',
+  },
+  {
+    id: 'long_distance', emoji: '📞', name: '异地恋', track: 'love',
+    ageStart: 20, ageEnd: 36, delayYears: 0, worthy: false,
+    cost: { moodDelta: -6, wealthMul: 0.92 },
+    gain: { moodDelta: 6 },
+    requires: ['date'],
+    desc: '隔着几百公里靠视频续命的爱情。',
+    consequence: '机票与思念齐飞：熬过来感情更牢，熬不过就败给了距离。',
+  },
+  {
+    id: 'propose', emoji: '💐', name: '浪漫求婚', track: 'love',
+    ageStart: 24, ageEnd: 40, delayYears: 0, worthy: true,
+    cost: { wealthMul: 0.9, moodDelta: -2 },
+    gain: { moodDelta: 11, identityDelta: 3 },
+    requires: ['date'],
+    desc: '精心策划一场单膝跪地的惊喜。',
+    consequence: '钻戒与玫瑰齐飞：朋友圈点赞拉满，钱包也跟着失血。',
+  },
+  {
+    id: 'second_child', emoji: '👨‍👩‍👧‍👦', name: '生育二胎', track: 'love',
+    ageStart: 28, ageEnd: 45, delayYears: 2, worthy: true, event: true,
+    cost: { wealthMul: 0.6, bodyDelta: -5, moodDelta: -8 },
+    gain: { moodDelta: 12, identityDelta: 4 },
+    requires: ['have_child'],
+    desc: '响应号召，再添一个小神兽。',
+    consequence: '二胎家庭欢乐加倍、开销也加倍：学区房与奶粉钱让钱包雪上加霜。',
+  },
+  {
+    id: 'affair', emoji: '🙈', name: '婚内出轨', track: 'love',
+    ageStart: 28, ageEnd: 58, delayYears: 0, worthy: false, trash: true,
+    cost: { wealthMul: 0.7, moodDelta: -4, identityDelta: -12 },
+    gain: { moodDelta: 6 },
+    requires: ['marriage'],
+    unlocks: ['divorce'],
+    desc: '抵不住诱惑，在婚姻外越了界。',
+    consequence: '纸终究包不住火：道德与法律双重反噬，家庭与名声一地鸡毛。',
+  },
+  {
+    id: 'divorce', emoji: '🪦', name: '协议离婚', track: 'love',
+    ageStart: 29, ageEnd: 60, delayYears: 0, worthy: false, event: true,
+    cost: { wealthMul: 0.6, moodDelta: -12, identityDelta: -4 },
+    gain: { moodDelta: 5 },
+    requires: ['marriage'],
+    desc: '一别两宽，分割财产各自安好。',
+    consequence: '围城散场：财产砍半、情绪重创，但也重获自由与喘息。',
+  },
+  {
+    id: 'volunteer', emoji: '🤲', name: '公益志愿', track: 'love',
+    ageStart: 18, ageEnd: 75, delayYears: 1, worthy: false,
+    cost: { wealthMul: 0.97, moodDelta: -1 },
+    gain: { moodDelta: 7, identityDelta: 3 },
+    desc: '支教 / 助老 / 救灾，做点纯粹利他的事。',
+    consequence: '被需要的感觉很上头：物质没增加，精神却异常富足。',
   },
 ]
 
@@ -1720,20 +1912,29 @@ export default function SimPage() {
     decisionsRef.current = decisions
   }, [decisions])
 
-  // 某年龄当前可抽的卡池（在窗口期内、尚未选中、可排除指定 id）。垃圾卡窗口宽、始终在池中（不受天赋/教养影响）。
+  // 某年龄当前可抽的卡池（在窗口期内、尚未选中、前置事件已满足、可排除指定 id）。
+  // 垃圾卡多为无前置、窗口宽，始终在池中（不受天赋/教养影响）；链式卡需先选中前置才会出现。
+  const reqMet = (c: LifeChoice) =>
+    !c.requires || c.requires.every((r) => decisionsRef.current.has(r))
   const poolAt = (year: number, exclude: string[]) =>
     LIFE_CHOICES.filter(
       (c) =>
         year >= c.ageStart &&
         year <= c.ageEnd &&
         !decisionsRef.current.has(c.id) &&
-        !exclude.includes(c.id),
+        !exclude.includes(c.id) &&
+        reqMet(c),
     )
 
-  // 年龄每过一岁 → 重新发 3 张牌、重置 2 次重随机会。
+  // 年龄每过一岁 → 重新发 3 张牌、重置 2 次重随机会。人死后不再发牌（一切都结束了）。
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
+    if (displayAge >= deathAgeRef.current) {
+      setHand([])
+      setRerollsLeft(0)
+      return
+    }
     setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 3))
     setRerollsLeft(2)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1768,8 +1969,17 @@ export default function SimPage() {
     const selected = decisions.has(c.id)
     const past = age > c.ageEnd
     const upcoming = age < c.ageStart
-    const locked = !inWindow && !selected
+    // 前置事件未满足：需要先选中 requires 里的全部事件，否则本卡锁定。
+    const reqMissing = (c.requires ?? []).filter((r) => !decisions.has(r))
+    const reqLocked = reqMissing.length > 0 && !selected
+    const locked = (!inWindow && !selected) || reqLocked
     const matured = selected && age >= c.ageStart + c.delayYears
+    const reqNames = reqMissing
+      .map((r) => CHOICE_BY_ID.get(r)?.name ?? r)
+      .join(' / ')
+    const unlockNames = (c.unlocks ?? [])
+      .map((u) => CHOICE_BY_ID.get(u)?.name ?? u)
+      .join(' / ')
     const tagFor = c.trash
       ? { name: '垃圾', color: '#ea580c' }
       : c.event
@@ -1825,7 +2035,12 @@ export default function SimPage() {
           <span style={{ color: '#b91c1c' }}>代价 {pieceText(c.cost)}</span>
           <span style={{ color: '#047857' }}>收益 {pieceText(c.gain)}</span>
         </div>
-        {selected ? (
+        {unlockNames && (
+          <div style={{ fontSize: 10, color: '#7c3aed' }}>🔓 解锁：{unlockNames}</div>
+        )}
+        {reqLocked ? (
+          <div style={{ fontSize: 11, color: '#b45309', lineHeight: 1.5 }}>🔒 需先完成：{reqNames}</div>
+        ) : selected ? (
           <div style={{ fontSize: 11, color: '#7c2d12', lineHeight: 1.5 }}>{c.consequence}</div>
         ) : upcoming ? (
           <div style={{ fontSize: 11, color: '#9ca3af' }}>还没到选择年龄（{c.ageStart} 岁开启）</div>
@@ -1871,6 +2086,9 @@ export default function SimPage() {
       lastFrameMsRef.current = now
       setAge((prev) => {
         const next = prev + (elapsed / BASE_MS_PER_YEAR) * timelineSpeed
+        // 人死了一切都结束：到达死亡年龄就停在那一刻，不再前进、不再循环。
+        const dA = deathAgeRef.current
+        if (next >= dA) return dA
         if (next > 100) return 1 + ((next - 1) % 100)
         return Math.max(1, next)
       })
@@ -1975,16 +2193,29 @@ export default function SimPage() {
     [familyId, regionId, gender, bgEffect, selectedTalents, choiceIds],
   )
 
-  // 当前年龄、已叠加抉择 cost/gain 的四维分（状态卡显示用）。
-  const liveMetrics = metricsAt(age, metricsCtx)
+  // 死亡年龄 + 死因：指标越差死得越早；走到这一年就立碑收场。
+  const deathInfo = useMemo(() => deathInfoFor(metricsCtx), [metricsCtx])
+  const deathAge = deathInfo.age
+  // 死亡年龄落进 ref，供 rAF 循环读取（人死了停在死亡那一刻）。
+  const deathAgeRef = useRef(deathAge)
+  useEffect(() => {
+    deathAgeRef.current = deathAge
+  }, [deathAge])
+  // 自动播放时一旦走到死亡年龄，立即暂停——一切都结束了。
+  useEffect(() => {
+    if (isTimelinePlaying && age >= deathAge) setIsTimelinePlaying(false)
+  }, [age, deathAge, isTimelinePlaying])
+
+  // 人死后指标全部冻结：用 min(当前年龄, 死亡年龄) 作为读取四维分的"有效年龄"。
+  const isDead = age >= deathAge
+  const metricAge = Math.min(age, deathAge)
+
+  // 当前年龄、已叠加抉择 cost/gain 的四维分（状态卡显示用；死后冻结在死亡年龄）。
+  const liveMetrics = metricsAt(metricAge, metricsCtx)
   const wealthScore = fmt1(liveMetrics.wealth)
   const identityScore = liveMetrics.identity
   const educationScore = liveMetrics.education
   const bodyScore = liveMetrics.body
-
-  // 死亡年龄 + 死因：指标越差死得越早；走到这一年就立碑收场。
-  const deathInfo = useMemo(() => deathInfoFor(metricsCtx), [metricsCtx])
-  const deathAge = deathInfo.age
 
   // 社会称许性 / 人性度：全是"性价比高"的选择 + 零人性化选择 = 像个没有感情的机器。
   const humanityStats = useMemo(() => {
@@ -2035,6 +2266,8 @@ export default function SimPage() {
   const trendOf = (d: number): StatTrend => (d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'flat')
 
   const statusCards: StatusCard[] = useMemo(() => {
+    // 死后冻结：阶段文案统一用"有效年龄"渲染，人死了一切都停在那一刻。
+    const age = metricAge
     // 学历趋势：18-25 上升，25-45 趋于平稳，老年期轻微贬值。
     const educationStage =
       age < 7
@@ -2163,7 +2396,7 @@ export default function SimPage() {
             : '慢病管理期；医疗与生活质量成本上升。',
       },
     ]
-  }, [age, familyId, regionId, wealthScore, identityScore, educationScore, bodyScore, dWealth, dIdentity, dEducation, dBody, bgEffect])
+  }, [metricAge, familyId, regionId, wealthScore, identityScore, educationScore, bodyScore, dWealth, dIdentity, dEducation, dBody, bgEffect])
 
   // 未来10年关注窗：只展示当前年龄起未来最多 10 年内可触达的窗口。
   // 超过 10 年的"即将到来"窗口被视为非当前关注，在主列表中隐藏。
@@ -3069,7 +3302,9 @@ export default function SimPage() {
 
                 {hand.length === 0 ? (
                   <div style={{ fontSize: 12, color: '#9ca3af', padding: '8px 0' }}>
-                    这个年龄暂时没有可抽的事件卡（窗口都已过或已选完）。
+                    {isDead
+                      ? '⚰️ 人已故去，牌局散场——这一生的抽卡到此为止。'
+                      : '这个年龄暂时没有可抽的事件卡（窗口都已过或已选完）。'}
                   </div>
                 ) : (
                   <div
