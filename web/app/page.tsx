@@ -1787,26 +1787,24 @@ export default function SimPage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>{c.label}</span>
+                    <span className="lqs-status-label">{c.label}</span>
                     <span
                       className="lqs-status-delta"
                       aria-label={`${c.trend === 'up' ? '上涨' : c.trend === 'down' ? '下跌' : '持平'} ${deltaText}`}
-                      style={{ color, fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      style={{ color, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}
                     >
-                      <span style={{ fontSize: 13 }}>{arrow}</span>
+                      <span style={{ fontSize: 12 }}>{arrow}</span>
                       <span>{deltaText}</span>
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                    <div className="lqs-status-value" title={c.value}>{c.value}</div>
-                    <div
-                      className="lqs-status-score"
-                      title={`当前指标值: ${c.score} ${c.unit}（与上一时间步比较 ${deltaText}）`}
-                    >
-                      {c.score}
-                      <span>{c.unit}</span>
-                    </div>
+                  <div
+                    className="lqs-status-score"
+                    title={`当前指标值: ${c.score} ${c.unit}（与上一时间步比较 ${deltaText}）`}
+                  >
+                    {c.score}
+                    <span>{c.unit}</span>
                   </div>
+                  <div className="lqs-status-value" title={c.value}>{c.value}</div>
                   <div className="lqs-status-hint" title={c.hint}>{c.hint}</div>
                 </div>
               )
