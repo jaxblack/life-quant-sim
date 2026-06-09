@@ -1169,7 +1169,8 @@ function wealthScoreAt(age: number, familyId: string, bgWealth: number): number 
   }
   const slopeBonus =
     familyId === 'wealthy' ? active * 0.45 : familyId === 'middle' ? active * 0.12 : 0
-  return Math.max(0, Math.round(familyBase + active + slopeBonus + bgWealth * 6))
+  // 不再钳到 >=0：家境差 + 选择拖累时资产可为负（负债）。
+  return Math.round(familyBase + active + slopeBonus + bgWealth * 6)
 }
 
 function identityScoreAt(age: number, regionBase: number, bgIdentity: number): number {
@@ -1182,7 +1183,8 @@ function identityScoreAt(age: number, regionBase: number, bgIdentity: number): n
       : age < 60 ? lerp1(age, 50, 60, 22, 20)
       : lerp1(age, 60, 100, 20, 4)
   const raw = regionBase + ageBonus + bgIdentity * 2
-  return Math.max(0, Math.min(100, Math.round(raw * 10) / 10))
+  // 钳制移到 metricsAt 统一处理（允许负数）。
+  return raw
 }
 
 function educationScoreAt(age: number, bgEducation: number): number {
@@ -1196,7 +1198,8 @@ function educationScoreAt(age: number, bgEducation: number): number {
   if (age >= 26) s += Math.min(34, age - 25) * 0.35
   if (age >= 60) s -= (age - 60) * 0.2
   s += bgEducation * 1.5
-  return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+  // 钳制移到 metricsAt 统一处理（允许负数）。
+  return s
 }
 
 function bodyScoreAt(age: number, bgBody: number, gender: 'male' | 'female'): number {
@@ -1207,13 +1210,60 @@ function bodyScoreAt(age: number, bgBody: number, gender: 'male' | 'female'): nu
   else if (age <= 70) s = 80 - (age - 50) * 1.8
   else s = 80 - 20 * 1.8 - (age - 70) * 2.4
   s += bgBody * 1.4 + (gender === 'male' ? 2 : -1)
-  return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+  // 钳制移到 metricsAt 统一处理（允许负数）。
+  return s
 }
 
 // 资产（万元）→ 0..100 归一化（对数压缩，避免高资产线性碾压其他维度）。
 function wealthNorm(wealthWan: number): number {
   const n = (Math.log10(Math.max(0, wealthWan) + 1) / Math.log10(3001)) * 100
   return Math.max(0, Math.min(100, n))
+}
+
+// 维度效应：天赋与出身家庭对四维分的"先天加成"（学历/身份/身体为分，资产为万）。
+type DimEffect = { education: number; identity: number; body: number; wealthWan: number }
+const ZERO_DIM: DimEffect = { education: 0, identity: 0, body: 0, wealthWan: 0 }
+
+// 个人天赋 → 四维先天加成：选得越多天赋越高，指标越好；全不选则只剩出身与教养基底（可为负）。
+const TALENT_EFFECTS: Record<Talent, DimEffect> = {
+  sports: { education: 0, identity: 2, body: 11, wealthWan: 0 },
+  arts: { education: 3, identity: 6, body: 0, wealthWan: 4 },
+  academic: { education: 13, identity: 4, body: 0, wealthWan: 0 },
+  social: { education: 0, identity: 10, body: 1, wealthWan: 6 },
+  expression: { education: 2, identity: 9, body: 1, wealthWan: 4 },
+  discipline: { education: 6, identity: 2, body: 5, wealthWan: 0 },
+  tech_esports: { education: 8, identity: 2, body: 0, wealthWan: 22 },
+  business: { education: 2, identity: 5, body: 0, wealthWan: 40 },
+}
+
+// 出身家庭 → 四维先天基底：家境好底子高，家境差则学历/身份/身体/资产都低（可为负）。
+const FAMILY_DIM_EFFECTS: Record<string, DimEffect> = {
+  wealthy: { education: 12, identity: 16, body: 6, wealthWan: 0 },
+  middle: { education: 4, identity: 5, body: 2, wealthWan: 0 },
+  working: { education: 0, identity: -2, body: 0, wealthWan: 0 },
+  poor: { education: -10, identity: -14, body: -7, wealthWan: -10 },
+  single: { education: -5, identity: -7, body: -2, wealthWan: -5 },
+  leftbehind: { education: -12, identity: -16, body: -4, wealthWan: -8 },
+}
+
+function talentBonus(talents: Talent[]): DimEffect {
+  return talents.reduce<DimEffect>(
+    (a, t) => {
+      const e = TALENT_EFFECTS[t]
+      return {
+        education: a.education + e.education,
+        identity: a.identity + e.identity,
+        body: a.body + e.body,
+        wealthWan: a.wealthWan + e.wealthWan,
+      }
+    },
+    { ...ZERO_DIM },
+  )
+}
+
+// 四维分钳制：允许负数（家境差 / 天赋空 → 指标可低于 0），上限 100。
+function clampScore(v: number): number {
+  return Math.max(-100, Math.min(100, v))
 }
 
 // ----------------------- 人生抉择系统：cost / gain / 隐藏心情（让模拟变成游戏）-----------------------
@@ -1456,6 +1506,17 @@ const LIFE_CHOICES: LifeChoice[] = [
 
 const CHOICE_BY_ID = new Map(LIFE_CHOICES.map((c) => [c.id, c]))
 
+// 从数组里不放回随机抽 n 个（抽卡发牌用）。
+function sampleN<T>(arr: T[], n: number): T[] {
+  const pool = [...arr]
+  const out: T[] = []
+  while (pool.length > 0 && out.length < n) {
+    const i = Math.floor(Math.random() * pool.length)
+    out.push(pool.splice(i, 1)[0])
+  }
+  return out
+}
+
 // 把一个 cost / gain 片段折叠进总 debuff（乘子相乘、加成相加）。
 function applyPiece(d: LifeDebuff, p?: Partial<LifeDebuff>) {
   if (!p) return
@@ -1512,16 +1573,19 @@ type MetricsCtx = {
   regionBase: number
   gender: 'male' | 'female'
   bg: FamilyBgEffect
+  talents?: Talent[] // 已选个人天赋（影响四维先天加成）
   choices?: string[] // 已选中的人生抉择 id（cost/gain 随年龄兑现）
 }
 
-// 某一年龄的四维分（已叠加抉择 cost/gain）。
+// 某一年龄的四维分（已叠加：出身家庭基底 + 教养氛围 + 个人天赋 + 抉择 cost/gain）。
 function metricsAt(age: number, ctx: MetricsCtx) {
   const d = ctx.choices ? decisionEffectAt(age, ctx.choices) : NO_DEBUFF
-  const wealth = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth) * d.wealthMul
-  const identity = clamp01x100(identityScoreAt(age, ctx.regionBase, ctx.bg.identity) + d.identityDelta)
-  const education = clamp01x100(educationScoreAt(age, ctx.bg.education) + d.eduDelta)
-  const body = clamp01x100(bodyScoreAt(age, ctx.bg.body, ctx.gender) + d.bodyDelta)
+  const tb = talentBonus(ctx.talents ?? [])
+  const fd = FAMILY_DIM_EFFECTS[ctx.familyId] ?? ZERO_DIM
+  const wealth = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth) * d.wealthMul + tb.wealthWan + fd.wealthWan
+  const identity = clampScore(identityScoreAt(age, ctx.regionBase, ctx.bg.identity) + d.identityDelta + tb.identity + fd.identity)
+  const education = clampScore(educationScoreAt(age, ctx.bg.education) + d.eduDelta + tb.education + fd.education)
+  const body = clampScore(bodyScoreAt(age, ctx.bg.body, ctx.gender) + d.bodyDelta + tb.body + fd.body)
   return { wealth, wealthN: wealthNorm(wealth), identity, education, body }
 }
 
@@ -1536,10 +1600,18 @@ function fmt1(v: number): number {
 
 // 隐藏分·心情 / 多巴胺（0..100）：身体 0.30、身份 0.25、资产(归一化) 0.25、学历 0.20，
 // 再叠加抉择的即时心情 moodDelta。0-5 岁"未开智"：童言无忌、无忧无虑，心情有高地板。
+// 资产与身体长期双低 → 心情被进一步拖低（贫病交加的精神内耗）。
 function happinessAt(age: number, ctx: MetricsCtx): number {
   const m = metricsAt(age, ctx)
   const d = ctx.choices ? decisionEffectAt(age, ctx.choices) : NO_DEBUFF
-  let h = 0.3 * m.body + 0.25 * m.identity + 0.25 * m.wealthN + 0.2 * m.education + d.moodDelta
+  const idN = Math.max(0, m.identity)
+  const eduN = Math.max(0, m.education)
+  const bodyN = Math.max(0, m.body)
+  let h = 0.3 * bodyN + 0.25 * idN + 0.25 * m.wealthN + 0.2 * eduN + d.moodDelta
+  // 资产 + 身体双低的精神内耗惩罚（心情是隐藏分，这里直接压低）。
+  if (m.wealthN < 28 && m.body < 38) {
+    h -= (28 - m.wealthN) * 0.25 + (38 - m.body) * 0.25
+  }
   if (age <= 5) {
     // 未开智：天真烂漫，多巴胺有高地板（随年龄从 92 缓降到 78）。
     const floor = lerp1(age, 0, 5, 92, 78)
@@ -1638,16 +1710,150 @@ export default function SimPage() {
   const scoreBandOf = (score: number) =>
     score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'
 
+  // —————— 抽卡机制：每过一岁出 3 张事件卡，每年 2 次单卡重随，也可一键随机选中 ——————
+  const [hand, setHand] = useState<string[]>([])
+  const [rerollsLeft, setRerollsLeft] = useState<number>(2)
+  const [showAllCards, setShowAllCards] = useState<boolean>(false)
+  const handYearRef = useRef<number>(-1)
+  const decisionsRef = useRef(decisions)
+  useEffect(() => {
+    decisionsRef.current = decisions
+  }, [decisions])
+
+  // 某年龄当前可抽的卡池（在窗口期内、尚未选中、可排除指定 id）。垃圾卡窗口宽、始终在池中（不受天赋/教养影响）。
+  const poolAt = (year: number, exclude: string[]) =>
+    LIFE_CHOICES.filter(
+      (c) =>
+        year >= c.ageStart &&
+        year <= c.ageEnd &&
+        !decisionsRef.current.has(c.id) &&
+        !exclude.includes(c.id),
+    )
+
+  // 年龄每过一岁 → 重新发 3 张牌、重置 2 次重随机会。
+  useEffect(() => {
+    if (handYearRef.current === displayAge) return
+    handYearRef.current = displayAge
+    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 3))
+    setRerollsLeft(2)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayAge])
+
+  const rerollCard = (index: number) => {
+    if (rerollsLeft <= 0) return
+    const pool = poolAt(displayAge, hand)
+    if (pool.length === 0) return
+    const pick = pool[Math.floor(Math.random() * pool.length)].id
+    setHand((prev) => prev.map((id, i) => (i === index ? pick : id)))
+    setRerollsLeft((n) => n - 1)
+  }
+
+  // 一键随机：从当前手牌里随机抽一张尚未选中的，直接选中。
+  const oneClickRandom = () => {
+    const candidates = hand.filter((id) => !decisions.has(id))
+    if (candidates.length === 0) return
+    const pick = candidates[Math.floor(Math.random() * candidates.length)]
+    toggleDecision(pick)
+  }
+
+  // 单张卡牌渲染（抽卡手牌 + 开发"全部卡池"两处共用）。
+  const cardPalette = (track: ChoiceTrack) =>
+    track === 'love'
+      ? { color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' }
+      : { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' }
+
+  const renderChoiceCard = (c: LifeChoice) => {
+    const col = cardPalette(c.track)
+    const inWindow = age >= c.ageStart && age <= c.ageEnd
+    const selected = decisions.has(c.id)
+    const past = age > c.ageEnd
+    const upcoming = age < c.ageStart
+    const locked = !inWindow && !selected
+    const matured = selected && age >= c.ageStart + c.delayYears
+    const tagFor = c.trash
+      ? { name: '垃圾', color: '#ea580c' }
+      : c.event
+      ? { name: '事件', color: '#7c3aed' }
+      : !c.worthy
+      ? { name: '人性化', color: '#db2777' }
+      : { name: '性价比高', color: '#047857' }
+    return (
+      <button
+        key={c.id}
+        type="button"
+        disabled={locked}
+        onClick={() => toggleDecision(c.id)}
+        aria-pressed={selected}
+        title={c.desc}
+        style={{
+          textAlign: 'left',
+          cursor: locked ? 'not-allowed' : 'pointer',
+          border: `1px solid ${selected ? col.color : col.border}`,
+          background: selected ? 'white' : 'rgba(255,255,255,0.55)',
+          borderRadius: 10,
+          padding: '8px 10px',
+          display: 'grid',
+          gap: 4,
+          opacity: locked ? 0.5 : 1,
+          fontFamily: 'inherit',
+          boxShadow: selected ? `0 0 0 1px ${col.color}` : 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600 }}>{c.emoji} {c.name}</span>
+          <span
+            style={{
+              fontSize: 10,
+              color: 'white',
+              background: tagFor.color,
+              padding: '1px 6px',
+              borderRadius: 999,
+            }}
+          >
+            {tagFor.name}
+          </span>
+          <span style={{ color: '#6b7280', fontSize: 11 }}>
+            {c.ageStart}-{c.ageEnd}岁{c.delayYears > 0 ? ` · ${c.delayYears}年后兑现` : ''}
+          </span>
+          {selected && (
+            <span style={{ color: matured ? '#047857' : '#b45309', fontSize: 11, fontWeight: 700 }}>
+              {matured ? '✓ 收益已兑现' : '投入中…'}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11 }}>
+          <span style={{ color: '#b91c1c' }}>代价 {pieceText(c.cost)}</span>
+          <span style={{ color: '#047857' }}>收益 {pieceText(c.gain)}</span>
+        </div>
+        {selected ? (
+          <div style={{ fontSize: 11, color: '#7c2d12', lineHeight: 1.5 }}>{c.consequence}</div>
+        ) : upcoming ? (
+          <div style={{ fontSize: 11, color: '#9ca3af' }}>还没到选择年龄（{c.ageStart} 岁开启）</div>
+        ) : past ? (
+          <div style={{ fontSize: 11, color: '#9ca3af' }}>窗口已过（{c.ageEnd} 岁截止），错过了</div>
+        ) : (
+          <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{c.desc}</div>
+        )}
+      </button>
+    )
+  }
+
   const toggleTalent = (id: Talent) => {
     setSelectedTalents((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
   }
+  const selectAllTalents = () => setSelectedTalents(TALENTS.map((t) => t.id))
+  const invertTalents = () =>
+    setSelectedTalents((prev) => TALENTS.filter((t) => !prev.includes(t.id)).map((t) => t.id))
   const toggleFamilyBg = (id: FamilyBackground) => {
     setFamilyBg((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
   }
+  const selectAllBg = () => setFamilyBg(FAMILY_BACKGROUNDS.map((b) => b.id))
+  const invertBg = () =>
+    setFamilyBg((prev) => FAMILY_BACKGROUNDS.filter((b) => !prev.includes(b.id)).map((b) => b.id))
 
   useEffect(() => {
     if (!isTimelinePlaying) {
@@ -1765,8 +1971,8 @@ export default function SimPage() {
   // 诱惑/抉择叠加成上下文（状态卡 / 多巴胺曲线 / 死亡年龄共用）。
   const choiceIds = useMemo(() => Array.from(decisions), [decisions])
   const metricsCtx = useMemo<MetricsCtx>(
-    () => ({ familyId, regionBase: REGION_IDENTITY_BASE[regionId], gender, bg: bgEffect, choices: choiceIds }),
-    [familyId, regionId, gender, bgEffect, choiceIds],
+    () => ({ familyId, regionBase: REGION_IDENTITY_BASE[regionId], gender, bg: bgEffect, talents: selectedTalents, choices: choiceIds }),
+    [familyId, regionId, gender, bgEffect, selectedTalents, choiceIds],
   )
 
   // 当前年龄、已叠加抉择 cost/gain 的四维分（状态卡显示用）。
@@ -2152,7 +2358,48 @@ export default function SimPage() {
           </div>
 
           <div className="lqs-aside-section">
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>教养氛围</div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>教养氛围</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={selectAllBg}
+                  style={{
+                    fontSize: 12,
+                    padding: '2px 10px',
+                    border: '1px dashed #9ca3af',
+                    borderRadius: 999,
+                    background: 'transparent',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  全选
+                </button>
+                <button
+                  type="button"
+                  onClick={invertBg}
+                  style={{
+                    fontSize: 12,
+                    padding: '2px 10px',
+                    border: '1px dashed #9ca3af',
+                    borderRadius: 999,
+                    background: 'transparent',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  反选
+                </button>
+              </div>
+            </div>
             <div
               role="group"
               aria-label="教养氛围过滤"
@@ -2243,21 +2490,38 @@ export default function SimPage() {
               }}
             >
               <span style={{ fontWeight: 600 }}>个人天赋</span>
-              <button
-                type="button"
-                onClick={() => setSelectedTalents(TALENTS.map((t) => t.id))}
-                style={{
-                  fontSize: 12,
-                  padding: '2px 10px',
-                  border: '1px dashed #9ca3af',
-                  borderRadius: 999,
-                  background: 'transparent',
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                }}
-              >
-                全选
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={selectAllTalents}
+                  style={{
+                    fontSize: 12,
+                    padding: '2px 10px',
+                    border: '1px dashed #9ca3af',
+                    borderRadius: 999,
+                    background: 'transparent',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  全选
+                </button>
+                <button
+                  type="button"
+                  onClick={invertTalents}
+                  style={{
+                    fontSize: 12,
+                    padding: '2px 10px',
+                    border: '1px dashed #9ca3af',
+                    borderRadius: 999,
+                    background: 'transparent',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  反选
+                </button>
+              </div>
             </div>
             <div
               role="group"
@@ -2296,7 +2560,7 @@ export default function SimPage() {
                 lineHeight: 1.6,
               }}
             >
-              天赋用于筛选右侧"最该抓住的人生窗口"，不做天赋值评估。
+              天赋既用于筛选右侧人生窗口，也作为四维分的<strong>先天加成</strong>：选得越多底子越好，全不选则只剩出身与教养基底（可能为负）。
             </p>
           </div>
         </aside>
@@ -2548,7 +2812,7 @@ export default function SimPage() {
             ))}
           </div>
 
-          {/* 关键人生事件：该阶段天然挤在这个年龄段的选择节点。 */}
+          {/* 每年总结：当年已选抉择与其综合影响（替代旧"关键人生事件"静态列表）。 */}
           <div
             className="lqs-key-events"
             style={{
@@ -2562,32 +2826,97 @@ export default function SimPage() {
               className="lqs-card-title"
               style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}
             >
-              关键人生事件
+              📅 {displayAge} 岁 · 当年总结
             </div>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: 18,
-                lineHeight: 1.8,
-                color: '#111827',
-                fontSize: 14,
-              }}
-            >
-              {stage.keyEvents.map((ev) => (
-                <li key={ev}>{ev}</li>
-              ))}
-            </ul>
-            <p
-              style={{
-                marginTop: 8,
-                marginBottom: 0,
-                color: '#6b7280',
-                fontSize: 12,
-                lineHeight: 1.6,
-              }}
-            >
-              这些事件在{stage.name}阶段会高频出现；错过或提前都可能触发重大路径切换。
-            </p>
+            {(() => {
+              const active = choiceIds
+                .map((id) => CHOICE_BY_ID.get(id))
+                .filter((c): c is LifeChoice => !!c && displayAge >= c.ageStart)
+                .sort((a, b) => a.ageStart - b.ageStart)
+              const net = decisionEffectAt(displayAge, choiceIds)
+              const netText = pieceText(net)
+              if (active.length === 0) {
+                return (
+                  <p
+                    style={{
+                      margin: 0,
+                      color: '#6b7280',
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    这一年还没有做出任何主动抉择——随波逐流，平平淡淡。可在下方"本年度抽卡"里选择。
+                  </p>
+                )
+              }
+              return (
+                <>
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingLeft: 0,
+                      listStyle: 'none',
+                      display: 'grid',
+                      gap: 8,
+                    }}
+                  >
+                    {active.map((c) => {
+                      const matured = displayAge >= c.ageStart + c.delayYears
+                      return (
+                        <li
+                          key={c.id}
+                          style={{
+                            display: 'grid',
+                            gap: 2,
+                            paddingBottom: 6,
+                            borderBottom: '1px dashed #f1f5f9',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              fontSize: 14,
+                              color: '#111827',
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>
+                              {c.emoji} {c.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: '1px 7px',
+                                borderRadius: 999,
+                                background: matured ? '#dcfce7' : '#fef9c3',
+                                color: matured ? '#166534' : '#854d0e',
+                              }}
+                            >
+                              {matured ? '收益已兑现' : '代价生效中'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                            {c.consequence}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <p
+                    style={{
+                      marginTop: 8,
+                      marginBottom: 0,
+                      color: netText === '—' ? '#9ca3af' : '#1f2937',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    当年综合影响：{netText}
+                  </p>
+                </>
+              )
+            })()}
           </div>
 
           {/* 情境提示 */}
@@ -2692,115 +3021,153 @@ export default function SimPage() {
                 </div>
               )}
 
-              {/* 两栏并列：感情线 | 事业线 */}
+              {/* 🎴 本年度抽卡：每过一岁出 3 张事件卡，每张可单独重随（每年 2 次），也可一键随机选中 */}
               <div
-                className="lqs-track-cols"
                 style={{
+                  border: '1px solid #e9d5ff',
+                  background: 'linear-gradient(180deg,#faf5ff,#ffffff)',
+                  borderRadius: 12,
+                  padding: 12,
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 12,
-                  alignItems: 'start',
+                  gap: 10,
                 }}
               >
-                {(
-                  [
-                    { track: 'love' as const, title: '💗 感情线', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
-                    { track: 'career' as const, title: '💼 事业线', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-                  ]
-                ).map((col) => {
-                  const items = LIFE_CHOICES.filter((c) => c.track === col.track)
-                  return (
-                    <div
-                      key={col.track}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: '#7c3aed' }}>
+                    🎴 本年度抽卡 · {displayAge} 岁
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>
+                      剩余重随 {rerollsLeft}/2
+                    </span>
+                    <button
+                      type="button"
+                      onClick={oneClickRandom}
                       style={{
-                        border: `1px solid ${col.border}`,
-                        background: col.bg,
-                        borderRadius: 12,
-                        padding: 10,
-                        display: 'grid',
-                        gap: 8,
-                        alignContent: 'start',
+                        fontSize: 12,
+                        padding: '4px 12px',
+                        border: 'none',
+                        borderRadius: 999,
+                        background: '#7c3aed',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
                       }}
                     >
-                      <div style={{ fontWeight: 700, color: col.color }}>{col.title}</div>
-                      {items.map((c) => {
-                        const inWindow = age >= c.ageStart && age <= c.ageEnd
-                        const selected = decisions.has(c.id)
-                        const past = age > c.ageEnd
-                        const upcoming = age < c.ageStart
-                        const locked = !inWindow && !selected
-                        const matured = selected && age >= c.ageStart + c.delayYears
-                        const tagFor = c.trash
-                          ? { name: '垃圾', color: '#ea580c' }
-                          : c.event
-                          ? { name: '事件', color: '#7c3aed' }
-                          : !c.worthy
-                          ? { name: '人性化', color: '#db2777' }
-                          : { name: '性价比高', color: '#047857' }
-                        return (
+                      🎲 一键随机
+                    </button>
+                  </div>
+                </div>
+
+                {hand.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#9ca3af', padding: '8px 0' }}>
+                    这个年龄暂时没有可抽的事件卡（窗口都已过或已选完）。
+                  </div>
+                ) : (
+                  <div
+                    className="lqs-gacha-hand"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: 10,
+                      alignItems: 'start',
+                    }}
+                  >
+                    {hand.map((id, i) => {
+                      const c = CHOICE_BY_ID.get(id)
+                      if (!c) return null
+                      const selected = decisions.has(id)
+                      return (
+                        <div key={`${id}-${i}`} style={{ display: 'grid', gap: 6 }}>
+                          {renderChoiceCard(c)}
                           <button
-                            key={c.id}
                             type="button"
-                            disabled={locked}
-                            onClick={() => toggleDecision(c.id)}
-                            aria-pressed={selected}
-                            title={c.desc}
+                            onClick={() => rerollCard(i)}
+                            disabled={rerollsLeft <= 0 || selected}
                             style={{
-                              textAlign: 'left',
-                              cursor: locked ? 'not-allowed' : 'pointer',
-                              border: `1px solid ${selected ? col.color : col.border}`,
-                              background: selected ? 'white' : 'rgba(255,255,255,0.55)',
-                              borderRadius: 10,
-                              padding: '8px 10px',
-                              display: 'grid',
-                              gap: 4,
-                              opacity: locked ? 0.5 : 1,
+                              fontSize: 12,
+                              padding: '4px 0',
+                              border: '1px dashed #c4b5fd',
+                              borderRadius: 8,
+                              background: rerollsLeft <= 0 || selected ? '#f3f4f6' : 'white',
+                              color: rerollsLeft <= 0 || selected ? '#9ca3af' : '#7c3aed',
+                              cursor: rerollsLeft <= 0 || selected ? 'not-allowed' : 'pointer',
                               fontFamily: 'inherit',
-                              boxShadow: selected ? `0 0 0 1px ${col.color}` : 'none',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 600 }}>{c.emoji} {c.name}</span>
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: 'white',
-                                  background: tagFor.color,
-                                  padding: '1px 6px',
-                                  borderRadius: 999,
-                                }}
-                              >
-                                {tagFor.name}
-                              </span>
-                              <span style={{ color: '#6b7280', fontSize: 11 }}>
-                                {c.ageStart}-{c.ageEnd}岁{c.delayYears > 0 ? ` · ${c.delayYears}年后兑现` : ''}
-                              </span>
-                              {selected && (
-                                <span style={{ color: matured ? '#047857' : '#b45309', fontSize: 11, fontWeight: 700 }}>
-                                  {matured ? '✓ 收益已兑现' : '投入中…'}
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11 }}>
-                              <span style={{ color: '#b91c1c' }}>代价 {pieceText(c.cost)}</span>
-                              <span style={{ color: '#047857' }}>收益 {pieceText(c.gain)}</span>
-                            </div>
-                            {selected ? (
-                              <div style={{ fontSize: 11, color: '#7c2d12', lineHeight: 1.5 }}>{c.consequence}</div>
-                            ) : upcoming ? (
-                              <div style={{ fontSize: 11, color: '#9ca3af' }}>还没到选择年龄（{c.ageStart} 岁开启）</div>
-                            ) : past ? (
-                              <div style={{ fontSize: 11, color: '#9ca3af' }}>窗口已过（{c.ageEnd} 岁截止），错过了</div>
-                            ) : (
-                              <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{c.desc}</div>
-                            )}
+                            {selected ? '已选中' : rerollsLeft <= 0 ? '🔁 重随已用完' : '🔁 重随'}
                           </button>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* 开发期：一键展开全部卡池 */}
+                <label
+                  style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showAllCards}
+                    onChange={(e) => setShowAllCards(e.target.checked)}
+                  />
+                  开发模式：显示全部卡池（感情线 ∥ 事业线）
+                </label>
               </div>
+
+              {/* 全部卡池（开发模式）：两栏并列 感情线 | 事业线 */}
+              {showAllCards && (
+                <div
+                  className="lqs-track-cols"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: 12,
+                    alignItems: 'start',
+                  }}
+                >
+                  {(
+                    [
+                      { track: 'love' as const, title: '💗 感情线', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
+                      { track: 'career' as const, title: '💼 事业线', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+                    ]
+                  ).map((col) => {
+                    const items = LIFE_CHOICES.filter((c) => c.track === col.track)
+                    return (
+                      <div
+                        key={col.track}
+                        style={{
+                          border: `1px solid ${col.border}`,
+                          background: col.bg,
+                          borderRadius: 12,
+                          padding: 10,
+                          display: 'grid',
+                          gap: 8,
+                          alignContent: 'start',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: col.color }}>{col.title}</div>
+                        {items.map((c) => renderChoiceCard(c))}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* 显示全部已错过（天赋筛选已移至左侧操作区） */}
               <label
