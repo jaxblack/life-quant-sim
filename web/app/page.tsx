@@ -143,7 +143,7 @@ const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f
 // 走路 / 成长动画改由 PixiJS (WebGL) 渲染，见 components/PixiCharacter。
 
 // 阶段角色舞台: 背景 / 地面用 CSS 渲染, 人物走路 / 成长动画交给 WebGL (PixiCharacter).
-function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string }) {
+function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId, happiness, lifeMeaning }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string; happiness: number[]; lifeMeaning: number }) {
   const a = appearanceForStageId(stageId)
   const tier = wealthTierForFamilyId(familyId)
   // 姿态补助 class: stooped 高龄、bouncy 童年。 leaning-fwd / upright 不额外加 class.
@@ -161,6 +161,8 @@ function CharacterStage({ stageId, age, progress, stageName, regionName, familyN
         a={a}
         progress={progress}
         tier={tier}
+        happiness={happiness}
+        lifeMeaning={lifeMeaning}
         ariaLabel={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人沿时间轴行走动画: ${a.caption}`}
       />
     </div>
@@ -1105,6 +1107,23 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
     longTermLoss:
       '错过这扇门：UCAS 与实习节奏高度前置，错过早期申请窗口会连锁影响毕业后留英竞争力。',
   },
+  {
+    id: 'end_of_life_planning',
+    title: '安乐死 / 临终规划窗口（尊严与意愿）',
+    ageStart: 80,
+    ageEnd: 100,
+    talents: ['discipline', 'social'],
+    talentMode: 'any',
+    track: 'both',
+    branches: [
+      '预立医疗指示（AD）+ 缓和医疗',
+      '合法地区的协助死亡（评估资格与流程）',
+      '居家临终 + 家属陪护',
+      '不做安排，顺其自然',
+    ],
+    longTermLoss:
+      '错过这扇门：临终意愿若未提前以法律与医疗文件固定，最后阶段的尊严、痛苦管理与家属决策都会被动；多数协助死亡制度要求清醒期内本人反复确认，拖延会直接丧失资格。',
+  },
 ]
 
 type OpportunityStatus = 'upcoming' | 'current' | 'closing' | 'missed'
@@ -1125,6 +1144,84 @@ const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const
 type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number]
 const BASE_MS_PER_YEAR = 5000
 
+// ----------------------- 连续评分内核（模块级纯函数，供状态卡 + 快乐曲线共用）-----------------------
+// 抽成纯函数后，"当前年龄的状态卡"与"0-100 全程快乐曲线"复用同一套公式，避免两处漂移。
+function lerp1(x: number, x0: number, x1: number, y0: number, y1: number): number {
+  return x <= x0 ? y0 : x >= x1 ? y1 : y0 + (y1 - y0) * ((x - x0) / (x1 - x0))
+}
+
+function wealthScoreAt(age: number, familyId: string, bgWealth: number): number {
+  const familyBase =
+    familyId === 'wealthy' ? 400 : familyId === 'middle' ? 60 : familyId === 'working' ? 12 : 3
+  const seg = (from: number, to: number, slope: number) =>
+    Math.max(0, Math.min(age, to) - from) * slope
+  let active = 0
+  if (age >= 22) {
+    active = seg(22, 30, 3) + seg(30, 45, 12) + seg(45, 58, 18) + seg(58, 68, 5)
+    if (age > 68) active -= (age - 68) * 9
+  }
+  const slopeBonus =
+    familyId === 'wealthy' ? active * 0.45 : familyId === 'middle' ? active * 0.12 : 0
+  return Math.max(0, Math.round(familyBase + active + slopeBonus + bgWealth * 6))
+}
+
+function identityScoreAt(age: number, regionBase: number, bgIdentity: number): number {
+  const ageBonus =
+    age < 7 ? lerp1(age, 0, 7, 0, 1)
+      : age < 19 ? lerp1(age, 7, 19, 1, 4)
+      : age < 23 ? lerp1(age, 19, 23, 4, 9)
+      : age < 35 ? lerp1(age, 23, 35, 9, 16)
+      : age < 50 ? lerp1(age, 35, 50, 16, 22)
+      : age < 60 ? lerp1(age, 50, 60, 22, 20)
+      : lerp1(age, 60, 100, 20, 4)
+  const raw = regionBase + ageBonus + bgIdentity * 2
+  return Math.max(0, Math.min(100, Math.round(raw * 10) / 10))
+}
+
+function educationScoreAt(age: number, bgEducation: number): number {
+  let s = 0
+  if (age >= 0) s = Math.min(8, age) * 1
+  if (age >= 7) s += Math.min(6, age - 7) * 3
+  if (age >= 13) s += Math.min(3, age - 12) * 5
+  if (age >= 16) s += Math.min(3, age - 15) * 6
+  if (age >= 19) s += Math.min(4, age - 18) * 7
+  if (age >= 23) s += Math.min(3, age - 22) * 4
+  if (age >= 26) s += Math.min(34, age - 25) * 0.35
+  if (age >= 60) s -= (age - 60) * 0.2
+  s += bgEducation * 1.5
+  return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+}
+
+function bodyScoreAt(age: number, bgBody: number, gender: 'male' | 'female'): number {
+  let s = 0
+  if (age <= 25) s = (age / 25) * 100
+  else if (age <= 30) s = 100
+  else if (age <= 50) s = 100 - (age - 30) * 1.0
+  else if (age <= 70) s = 80 - (age - 50) * 1.8
+  else s = 80 - 20 * 1.8 - (age - 70) * 2.4
+  s += bgBody * 1.4 + (gender === 'male' ? 2 : -1)
+  return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
+}
+
+// 资产（万元）→ 0..100 归一化（对数压缩，避免高资产线性碾压其他维度）。
+function wealthNorm(wealthWan: number): number {
+  const n = (Math.log10(Math.max(0, wealthWan) + 1) / Math.log10(3001)) * 100
+  return Math.max(0, Math.min(100, n))
+}
+
+// 快乐程度（0..100）：自设权重——身体 0.30、身份 0.25、资产(归一化) 0.25、学历 0.20。
+function happinessAt(
+  age: number,
+  ctx: { familyId: string; regionBase: number; gender: 'male' | 'female'; bg: FamilyBgEffect },
+): number {
+  const w = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth)
+  const i = identityScoreAt(age, ctx.regionBase, ctx.bg.identity)
+  const e = educationScoreAt(age, ctx.bg.education)
+  const b = bodyScoreAt(age, ctx.bg.body, ctx.gender)
+  const h = 0.3 * b + 0.25 * i + 0.25 * wealthNorm(w) + 0.2 * e
+  return Math.max(0, Math.min(100, h))
+}
+
 export default function SimPage() {
   const [age, setAge] = useState<number>(18)
   const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(true)
@@ -1133,6 +1230,7 @@ export default function SimPage() {
   const lastFrameMsRef = useRef<number | null>(null)
   const [regionId, setRegionId] = useState<RegionId>(REGIONS[1].id)
   const [familyId, setFamilyId] = useState<string>(FAMILIES[1].id)
+  const [gender, setGender] = useState<'male' | 'female'>('male')
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
     TALENTS.map((t) => t.id)
   )
@@ -1289,78 +1387,30 @@ export default function SimPage() {
   //   身份 identity: 分（地域基础分 + 年龄阶段红利，0~100）
   //   学历 education: 分（受教育年限 + 上限封顶，0~100）
   //   身体 body: 分（婴幼儿爬升 → 25 岁前后峰值 → 老年衰退，0~100）
-  const wealthScore = (() => {
-    const familyBase =
-      familyId === 'wealthy' ? 400
-        : familyId === 'middle' ? 60
-        : familyId === 'working' ? 12
-        : 3
-    // 主动积累曲线（更贴近现实：钱很难赚）。
-    //   22-30 起步期：还贷 / 攒首付，积累极慢；
-    //   30-45 提速期：收入与复利同时起来，但被房贷 / 育儿成本拖累；
-    //   45-58 高位期：负担减轻 + 资历溢价，积累最快；
-    //   58-68 见顶平台：增量趋缓；
-    //   68+   消耗期：退休后净资产缓慢下行。
-    const seg = (from: number, to: number, slope: number) =>
-      Math.max(0, Math.min(age, to) - from) * slope
-    let active = 0
-    if (age >= 22) {
-      active =
-        seg(22, 30, 3) +   // 起步期：8 年才攒 ~24 万
-        seg(30, 45, 12) +  // 提速期：15 年 ~180 万
-        seg(45, 58, 18) +  // 高位期：13 年 ~234 万
-        seg(58, 68, 5)     // 平台期：增量很小
-      if (age > 68) active -= (age - 68) * 9 // 消耗期：退休后净资产下行
-    }
-    // 出身家庭对“主动积累斜率”的加成（资本越厚，钱生钱越快）。
-    const slopeBonus = familyId === 'wealthy' ? active * 0.45
-      : familyId === 'middle' ? active * 0.12
-      : 0
-    return Math.max(0, Math.round(familyBase + active + slopeBonus + bgEffect.wealth * 6))
-  })()
+  const wealthScore = wealthScoreAt(age, familyId, bgEffect.wealth)
+  const identityScore = identityScoreAt(age, REGION_IDENTITY_BASE[regionId], bgEffect.identity)
+  const educationScore = educationScoreAt(age, bgEffect.education)
+  const bodyScore = bodyScoreAt(age, bgEffect.body, gender)
 
-  const identityScore = (() => {
+  // 快乐曲线：0..100 岁逐岁的快乐程度（0~100），由四维分综合而来。
+  // 小人脚下走出的这条曲线 = 快乐程度；曲线下方围成的面积 = 人生意义。
+  const happinessSeries = useMemo(() => {
     const regionBase = REGION_IDENTITY_BASE[regionId]
-    // 年龄阶段红利：在校 < 应届 < 在职 < 中坚；老年回落。
-    const stageBonus =
-      age < 7 ? 0
-        : age < 19 ? 3
-        : age < 23 ? 8
-        : age < 35 ? 12
-        : age < 60 ? 14
-        : age < 75 ? 6
-        : 0
-    const raw = regionBase + stageBonus + bgEffect.identity * 2 - (age >= 60 ? (age - 60) * 0.3 : 0)
-    return Math.max(0, Math.min(100, Math.round(raw * 10) / 10))
-  })()
+    const ctx = { familyId, regionBase, gender, bg: bgEffect }
+    const arr: number[] = []
+    for (let y = 0; y <= 100; y++) arr.push(happinessAt(y, ctx))
+    return arr
+  }, [regionId, familyId, gender, bgEffect])
 
-  const educationScore = (() => {
-    // 简化的“受教育投入分”累计曲线，到 25 岁前后封顶。
-    let s = 0
-    if (age >= 0) s = Math.min(8, age) * 1 // 0-7: 学前/识字
-    if (age >= 7) s += Math.min(6, age - 7) * 3 // 7-12: 小学
-    if (age >= 13) s += Math.min(3, age - 12) * 5 // 13-15: 初中
-    if (age >= 16) s += Math.min(3, age - 15) * 6 // 16-18: 高中
-    if (age >= 19) s += Math.min(4, age - 18) * 7 // 19-22: 本科
-    if (age >= 23) s += Math.min(3, age - 22) * 4 // 23-25: 硕士 / 早期工作沉淀
-    if (age >= 26) s += Math.min(60, age - 25) * 0.05 // 持续学习的边际加成（很小）
-    // 老年期：学历折旧（行业更迭，含金量逐年下降）。
-    if (age >= 60) s -= (age - 60) * 0.2
-    s += bgEffect.education * 1.5
-    return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
-  })()
-
-  const bodyScore = (() => {
-    // 0-25 爬升至 100，25-30 维持，30-50 缓降，50+ 加速下降。
-    let s = 0
-    if (age <= 25) s = (age / 25) * 100
-    else if (age <= 30) s = 100
-    else if (age <= 50) s = 100 - (age - 30) * 1.0
-    else if (age <= 70) s = 80 - (age - 50) * 1.8
-    else s = 80 - 20 * 1.8 - (age - 70) * 2.4
-    s += bgEffect.body * 1.4
-    return Math.max(0, Math.min(100, Math.round(s * 10) / 10))
-  })()
+  // 人生意义（梯形积分快乐曲线下的总面积，归一化到 0~100）。
+  const lifeMeaningTotal = useMemo(() => {
+    let area = 0
+    for (let i = 1; i < happinessSeries.length; i++) {
+      area += (happinessSeries[i - 1] + happinessSeries[i]) / 2
+    }
+    // area 最大 = 100 * 100 = 10000；归一化到 0~100。
+    return Math.round((area / 10000) * 100 * 10) / 10
+  }, [happinessSeries])
 
   // 缓存上一时间步分值，用于计算 delta。初次渲染 delta = 0 / trend = 'flat'。
   const prevScoresRef = useRef<{ wealth: number; identity: number; education: number; body: number } | null>(null)
@@ -1663,6 +1713,50 @@ export default function SimPage() {
           </div>
 
           <div className="lqs-aside-section">
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>出生性别</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { id: 'male' as const, name: '♂ 男' },
+                { id: 'female' as const, name: '♀ 女' },
+              ]).map((g) => {
+                const active = gender === g.id
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGender(g.id)}
+                    aria-pressed={active}
+                    className="lqs-chip"
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      border: `1px solid ${active ? '#111827' : '#d1d5db'}`,
+                      background: active ? '#111827' : 'white',
+                      color: active ? 'white' : '#111827',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {g.name}
+                  </button>
+                )
+              })}
+            </div>
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 0,
+                color: '#6b7280',
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              性别影响身体机能基准（男 +2 / 女 −1），并间接作用于快乐曲线。
+            </p>
+          </div>
+
+          <div className="lqs-aside-section">
             <div style={{ fontWeight: 600, marginBottom: 8 }}>教养氛围</div>
             <div
               role="group"
@@ -1741,6 +1835,73 @@ export default function SimPage() {
               }}
             >
               {family.brief}
+            </p>
+          </div>
+
+          <div className="lqs-aside-section">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>个人天赋</span>
+              <button
+                type="button"
+                onClick={() => setSelectedTalents(TALENTS.map((t) => t.id))}
+                style={{
+                  fontSize: 12,
+                  padding: '2px 10px',
+                  border: '1px dashed #9ca3af',
+                  borderRadius: 999,
+                  background: 'transparent',
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                }}
+              >
+                全选
+              </button>
+            </div>
+            <div
+              role="group"
+              aria-label="个人天赋筛选"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
+            >
+              {TALENTS.map((t) => {
+                const active = selectedTalents.includes(t.id)
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTalent(t.id)}
+                    aria-pressed={active}
+                    style={{
+                      fontSize: 12,
+                      padding: '4px 10px',
+                      border: `1px solid ${active ? '#111827' : '#d1d5db'}`,
+                      borderRadius: 999,
+                      background: active ? '#111827' : 'white',
+                      color: active ? 'white' : '#111827',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                )
+              })}
+            </div>
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 0,
+                color: '#6b7280',
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              天赋用于筛选右侧"最该抓住的人生窗口"，不做天赋值评估。
             </p>
           </div>
         </aside>
@@ -1832,6 +1993,8 @@ export default function SimPage() {
               regionName={region.name}
               familyName={family.name}
               familyId={familyId}
+              happiness={happinessSeries}
+              lifeMeaning={lifeMeaningTotal}
             />
             <div
               style={{
@@ -2124,10 +2287,8 @@ export default function SimPage() {
               })}
             </div>
 
-            {/* 个人天赋筛选 */}
+            {/* 显示全部已错过（天赋筛选已移至左侧操作区） */}
             <div
-              role="group"
-              aria-label="个人天赋筛选"
               style={{
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -2135,52 +2296,10 @@ export default function SimPage() {
                 alignItems: 'center',
               }}
             >
-              <span style={{ fontSize: 12, color: '#6b7280', marginRight: 4 }}>
-                个人天赋：
-              </span>
-              {TALENTS.map((t) => {
-                const active = selectedTalents.includes(t.id)
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleTalent(t.id)}
-                    aria-pressed={active}
-                    style={{
-                      fontSize: 12,
-                      padding: '4px 10px',
-                      border: `1px solid ${active ? '#111827' : '#d1d5db'}`,
-                      borderRadius: 999,
-                      background: active ? '#111827' : 'white',
-                      color: active ? 'white' : '#111827',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {t.name}
-                  </button>
-                )
-              })}
-              <button
-                type="button"
-                onClick={() => setSelectedTalents(TALENTS.map((t) => t.id))}
-                style={{
-                  fontSize: 12,
-                  padding: '4px 10px',
-                  border: '1px dashed #9ca3af',
-                  borderRadius: 999,
-                  background: 'transparent',
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                  marginLeft: 4,
-                }}
-              >
-                全选
-              </button>
               <label
                 style={{
                   fontSize: 12,
                   color: '#6b7280',
-                  marginLeft: 8,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,

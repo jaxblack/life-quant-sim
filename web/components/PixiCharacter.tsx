@@ -19,6 +19,10 @@ type Props = {
   progress: number
   /** 家境层级：驱动服饰的贵气/朴素档位（富裕金边、贫困补丁）。 */
   tier?: WealthTier
+  /** 0..100 岁逐岁的快乐程度(0~100)，作为背景曲线绘制；曲线下面积 = 人生意义。 */
+  happiness?: number[]
+  /** 人生意义总分（曲线下归一化面积 0~100），走到坟墓时展示。 */
+  lifeMeaning?: number
   /** 无障碍描述，挂在容器上。 */
   ariaLabel?: string
 }
@@ -26,7 +30,7 @@ type Props = {
 // 把 0..1 的明暗叠加到一个 Graphics 上的小工具：用低透明度白/黑罩出高光与暗面。
 // （Pixi v8 也有 FillGradient，但分层平涂更可控、跨版本更稳。）
 
-export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
+export default function PixiCharacter({ a, progress, tier, happiness, lifeMeaning, ariaLabel }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // Pixi 运行期对象（动态加载，统一用 any 规避命名空间类型摩擦）。
   const appRef = useRef<any>(null)
@@ -34,6 +38,8 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
   const appearanceRef = useRef<CharacterAppearance>(a)
   const tierRef = useRef<WealthTier>(tier ?? 'middle')
   const progressRef = useRef(progress)
+  const happinessRef = useRef<number[]>(happiness ?? [])
+  const lifeMeaningRef = useRef<number>(lifeMeaning ?? 0)
   const animRef = useRef({ t: 0, dir: 1, x: 0 })
   const reducedRef = useRef(false)
   const destroyedRef = useRef(false)
@@ -50,6 +56,13 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
     const layers = layersRef.current
     if (layers && typeof layers.applyProgress === 'function') layers.applyProgress()
   }, [progress])
+
+  useEffect(() => {
+    happinessRef.current = happiness ?? []
+    lifeMeaningRef.current = lifeMeaning ?? 0
+    const layers = layersRef.current
+    if (layers && typeof layers.drawScene === 'function') layers.drawScene()
+  }, [happiness, lifeMeaning])
 
   useEffect(() => {
     let cancelled = false
@@ -92,6 +105,13 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
 
       // ---- 图层结构 ----
       const stage = app.stage
+      const curve = new PIXI.Graphics() // 背景：快乐曲线 + 人生意义面积
+      const grave = new PIXI.Graphics() // 终点：墓碑（age 100）
+      const meaningText = new PIXI.Text({
+        text: '',
+        style: { fontFamily: 'system-ui, sans-serif', fontSize: 11, fill: '#475569', fontWeight: '600' },
+      })
+      meaningText.visible = false
       const dust = new PIXI.Container() // 背景漂浮尘埃
       const shadow = new PIXI.Graphics() // 地面软投影
       shadow.filters = [new PIXI.BlurFilter({ strength: 4, quality: 3 })]
@@ -99,12 +119,15 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
       const footDust = new PIXI.Container() // 落脚扬尘（世界坐标，不随 walker 翻面）
       const figure = new PIXI.Container() // 人物本体（站在 walker 原点 = 脚底）
       walker.addChild(figure)
+      stage.addChild(curve)
       stage.addChild(dust)
       stage.addChild(shadow)
+      stage.addChild(grave)
       stage.addChild(footDust)
       stage.addChild(walker)
+      stage.addChild(meaningText)
 
-      layersRef.current = { dust, shadow, walker, footDust, figure, PIXI }
+      layersRef.current = { curve, grave, meaningText, dust, shadow, walker, footDust, figure, PIXI }
 
       // 漂浮尘埃初始化。
       const motes: any[] = []
@@ -483,6 +506,76 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
         walker.x = leftX + p * span
         walker.scale.x = 1
         shadow.x = walker.x
+        drawScene()
+      }
+      // 背景快乐曲线 + 人生意义面积 + 终点墓碑。
+      const drawScene = () => {
+        const hap = happinessRef.current
+        const span = Math.max(0, rightX - leftX)
+        const p = Math.max(0, Math.min(1, progressRef.current))
+        // 曲线绘制区：底部留给小人脚下地面，顶部留白。
+        const curveBottom = groundY - 2
+        const curveTop = Math.max(8, H * 0.16)
+        const curveH = Math.max(10, curveBottom - curveTop)
+        const xAt = (ageIdx: number) => leftX + (ageIdx / 100) * span
+        const yAt = (h: number) => curveBottom - (Math.max(0, Math.min(100, h)) / 100) * curveH
+
+        curve.clear()
+        if (hap.length >= 2) {
+          // 1) 完整曲线下方淡填充（未来部分，浅灰）。
+          curve.moveTo(xAt(0), curveBottom)
+          for (let i = 0; i < hap.length; i++) curve.lineTo(xAt(i), yAt(hap[i]))
+          curve.lineTo(xAt(hap.length - 1), curveBottom)
+          curve.closePath()
+          curve.fill({ color: '#cbd5e1', alpha: 0.18 })
+
+          // 2) 已走过部分（age ≤ 当前）高亮填充 = 已积累的人生意义。
+          const curIdx = Math.max(0, Math.min(100, p * 100))
+          const lastWhole = Math.floor(curIdx)
+          curve.moveTo(xAt(0), curveBottom)
+          for (let i = 0; i <= lastWhole; i++) curve.lineTo(xAt(i), yAt(hap[i]))
+          // 在当前 x 处插值收尾，让填充边缘精确跟随小人。
+          if (lastWhole < hap.length - 1) {
+            const frac = curIdx - lastWhole
+            const hInterp = hap[lastWhole] + (hap[lastWhole + 1] - hap[lastWhole]) * frac
+            curve.lineTo(xAt(curIdx), yAt(hInterp))
+          }
+          curve.lineTo(xAt(curIdx), curveBottom)
+          curve.closePath()
+          curve.fill({ color: '#f59e0b', alpha: 0.22 })
+
+          // 3) 曲线描边（整条），已走过部分更浓。
+          curve.moveTo(xAt(0), yAt(hap[0]))
+          for (let i = 1; i < hap.length; i++) curve.lineTo(xAt(i), yAt(hap[i]))
+          curve.stroke({ width: 1.5, color: '#94a3b8', alpha: 0.55 })
+          curve.moveTo(xAt(0), yAt(hap[0]))
+          for (let i = 1; i <= lastWhole; i++) curve.lineTo(xAt(i), yAt(hap[i]))
+          curve.stroke({ width: 2, color: '#d97706', alpha: 0.9 })
+        }
+
+        // 终点墓碑：临近 / 到达 100 岁时出现在最右端。
+        grave.clear()
+        if (p >= 0.985) {
+          const gw = Math.max(14, 16 * scale)
+          const gh = gw * 1.5
+          const gx = rightX - gw * 1.3 // 立在小人左侧，避免被人物完全遮挡
+          const gy = groundY
+          // 碑身
+          grave.roundRect(gx - gw / 2, gy - gh, gw, gh, gw * 0.45).fill('#94a3b8').stroke({ width: 1, color: '#64748b' })
+          grave.rect(gx - gw / 2, gy - gh * 0.5, gw, gh * 0.5).fill({ color: '#000000', alpha: 0.08 })
+          // 十字
+          grave.rect(gx - 1, gy - gh + gh * 0.18, 2, gh * 0.3).fill('#475569')
+          grave.rect(gx - gw * 0.18, gy - gh + gh * 0.28, gw * 0.36, 2).fill('#475569')
+          // 土堆
+          grave.ellipse(gx, gy, gw * 0.9, gw * 0.28).fill('#a8a29e')
+
+          meaningText.visible = true
+          meaningText.text = `人生意义 ${lifeMeaningRef.current.toFixed(1)}`
+          meaningText.x = Math.min(W - meaningText.width - 4, Math.max(4, gx - meaningText.width / 2))
+          meaningText.y = Math.max(4, gy - gh - 16)
+        } else {
+          meaningText.visible = false
+        }
       }
       const layout = () => {
         W = host.clientWidth || W
@@ -504,6 +597,7 @@ export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
       const ro = new ResizeObserver(() => layout())
       ro.observe(host)
       ;(layersRef.current as any).applyProgress = applyProgress
+      ;(layersRef.current as any).drawScene = drawScene
 
       // ---- 动画 ----
       const reduced = reducedRef.current
