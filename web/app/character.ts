@@ -14,8 +14,6 @@ export type CharacterAccessory =
 export type Mouth = 'big-smile' | 'smile' | 'calm' | 'firm' | 'soft-down'
 export type Posture = 'upright' | 'leaning-fwd' | 'stooped' | 'bouncy'
 export type HairStyle = 'pony-twin' | 'short' | 'medium' | 'thinning' | 'bald-top' | 'bald'
-// 家境档位：决定服装质感、配饰与体态细节。high=富裕/上层，mid=中产/工薪，low=贫困/留守。
-export type WealthTier = 'high' | 'mid' | 'low'
 export type CharacterAppearance = {
   heightScale: number // 0.55 童年 → 1.0 青/成年 → 0.95 中年 → 0.85 高龄
   outfitFill: string
@@ -36,21 +34,9 @@ export type CharacterAppearance = {
   paunch: boolean // 中年微肚
   accessory: CharacterAccessory
   caption: string
-  // ---- 家境派生（由 applyFamilyToAppearance 注入；渲染层据此画细节）----
-  wealthTier: WealthTier // 默认 mid
-  outfitTrim: string // 服装镶边/点缀色（富裕=金边，贫困=洗白补丁色）
-  patched: boolean // 是否带补丁（贫困/留守）
-  hasWatch: boolean // 富裕：腕表
-  hasPocketSquare: boolean // 富裕：胸袋巾
 }
 
-// 阶段基础外观：不含家境派生字段（这些由 appearanceForStageId 按出身家庭注入）。
-type BaseAppearance = Omit<
-  CharacterAppearance,
-  'wealthTier' | 'outfitTrim' | 'patched' | 'hasWatch' | 'hasPocketSquare'
->
-
-export const CHARACTER_BY_STAGE: Record<string, BaseAppearance> = {
+export const CHARACTER_BY_STAGE: Record<string, CharacterAppearance> = {
   childhood: {
     heightScale: 0.55,
     outfitFill: '#fbbf24', outfitStroke: '#b45309',
@@ -151,78 +137,31 @@ export const CHARACTER_BY_STAGE: Record<string, BaseAppearance> = {
   },
 }
 
-// 出身家庭 → 家境档位。决定服装质感与配饰（与 page.tsx 的 FAMILIES id 对齐）。
-export const FAMILY_TIER: Record<string, WealthTier> = {
-  wealthy: 'high',
-  middle: 'mid',
-  working: 'mid',
-  poor: 'low',
-  single: 'mid',
-  leftbehind: 'low',
+export function appearanceForStageId(id: string): CharacterAppearance {
+  return CHARACTER_BY_STAGE[id] ?? CHARACTER_BY_STAGE.early_adult
 }
 
-// 小工具：把十六进制色朝白/黑插值，用于按家境提亮或压暗服装。
-function mix(hex: string, target: '#fff' | '#000', amount: number): string {
-  const h = hex.replace('#', '')
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
-  const r = parseInt(full.slice(0, 2), 16)
-  const g = parseInt(full.slice(2, 4), 16)
-  const b = parseInt(full.slice(4, 6), 16)
-  const t = target === '#fff' ? 255 : 0
-  const nr = Math.round(r + (t - r) * amount)
-  const ng = Math.round(g + (t - g) * amount)
-  const nb = Math.round(b + (t - b) * amount)
-  return '#' + [nr, ng, nb].map((v) => v.toString(16).padStart(2, '0')).join('')
-}
+// 家境层级：驱动人物服饰的"贵气/朴素"档位（与阶段服装叠加）。
+//   wealthy 富裕 → 金边西装 / 胸袋巾 / 腕表 / 锃亮皮鞋
+//   middle  中产 → 干净得体，无额外装饰
+//   working 工薪 → 朴素低饱和
+//   poor    贫困 → 衣物补丁 / 素简
+export type WealthTier = 'wealthy' | 'middle' | 'working' | 'poor'
 
-// 把家境档位叠加到阶段基础外观上：
-//  - high：服装更亮/更饱和 + 金边 + 腕表 + 胸袋巾，体态更挺拔；
-//  - low：服装偏灰旧 + 补丁，无奢侈配饰；
-//  - mid：基本沿用阶段配色，细节中性。
-function applyFamilyToAppearance(base: BaseAppearance, tier: WealthTier): CharacterAppearance {
-  if (tier === 'high') {
-    return {
-      ...base,
-      outfitFill: mix(base.outfitFill, '#fff', 0.12),
-      outfitFillLight: mix(base.outfitFillLight, '#fff', 0.18),
-      outfitFillDark: base.outfitFillDark,
-      posture: base.posture === 'stooped' ? base.posture : 'upright',
-      wealthTier: 'high',
-      outfitTrim: '#f5c451', // 金边
-      patched: false,
-      hasWatch: base.accessory !== 'school' && base.accessory !== 'school_tie',
-      hasPocketSquare: base.accessory === 'tie' || base.accessory === 'briefcase',
-      caption: `${base.caption} · 质感上乘`,
-    }
-  }
-  if (tier === 'low') {
-    return {
-      ...base,
-      outfitFill: mix(base.outfitFill, '#000', 0.1),
-      outfitFillLight: mix(base.outfitFillLight, '#000', 0.06),
-      outfitFillDark: mix(base.outfitFillDark, '#000', 0.12),
-      wealthTier: 'low',
-      outfitTrim: mix(base.outfitFill, '#fff', 0.32), // 洗白补丁色
-      patched: true,
-      hasWatch: false,
-      hasPocketSquare: false,
-      caption: `${base.caption} · 素简耐穿`,
-    }
-  }
-  return {
-    ...base,
-    wealthTier: 'mid',
-    outfitTrim: mix(base.outfitFillDark, '#fff', 0.22),
-    patched: false,
-    hasWatch: false,
-    hasPocketSquare: false,
+// 出身家庭 id → 家境层级（单亲并入工薪、留守并入贫困，仅就服饰观感而言）。
+export function wealthTierForFamilyId(id: string): WealthTier {
+  switch (id) {
+    case 'wealthy':
+      return 'wealthy'
+    case 'middle':
+      return 'middle'
+    case 'working':
+    case 'single':
+      return 'working'
+    case 'poor':
+    case 'leftbehind':
+      return 'poor'
+    default:
+      return 'middle'
   }
 }
-
-// 取某阶段外观；可选传入出身家庭 id，使人物模型与家境（服装质感 / 配饰）关联。
-export function appearanceForStageId(id: string, familyId?: string): CharacterAppearance {
-  const base = CHARACTER_BY_STAGE[id] ?? CHARACTER_BY_STAGE.early_adult
-  const tier = (familyId && FAMILY_TIER[familyId]) || 'mid'
-  return applyFamilyToAppearance(base, tier)
-}
-

@@ -11,12 +11,14 @@
 // 仅在客户端运行（动态 import('pixi.js') 规避 SSR）。
 
 import { useEffect, useRef } from 'react'
-import type { CharacterAppearance } from '../app/character'
+import type { CharacterAppearance, WealthTier } from '../app/character'
 
 type Props = {
   a: CharacterAppearance
   /** 0..1 的人生进度：0 = 出生(最左)，1 = 人生终点(最右)。小人沿时间轴行走到此处。 */
   progress: number
+  /** 家境层级：驱动服饰的贵气/朴素档位（富裕金边、贫困补丁）。 */
+  tier?: WealthTier
   /** 无障碍描述，挂在容器上。 */
   ariaLabel?: string
 }
@@ -24,12 +26,13 @@ type Props = {
 // 把 0..1 的明暗叠加到一个 Graphics 上的小工具：用低透明度白/黑罩出高光与暗面。
 // （Pixi v8 也有 FillGradient，但分层平涂更可控、跨版本更稳。）
 
-export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
+export default function PixiCharacter({ a, progress, tier, ariaLabel }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // Pixi 运行期对象（动态加载，统一用 any 规避命名空间类型摩擦）。
   const appRef = useRef<any>(null)
   const layersRef = useRef<any>(null)
   const appearanceRef = useRef<CharacterAppearance>(a)
+  const tierRef = useRef<WealthTier>(tier ?? 'middle')
   const progressRef = useRef(progress)
   const animRef = useRef({ t: 0, dir: 1, x: 0 })
   const reducedRef = useRef(false)
@@ -137,7 +140,7 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const torsoH = figureH * 0.42
         const legTop = torsoTop + torsoH * (ap.paunch ? 0.96 : 1.0)
         const legH = figureH * 0.34
-        const limbW = 2.4
+        const limbW = 1.8
         const armH = torsoH * 0.92
         const upperArmH = armH * 0.52
         const foreArmH = armH * 0.5
@@ -200,7 +203,7 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const backForeG = new PIXI.Graphics()
         paintLimb(backForeG, limbW * 0.95, foreArmH, sleeveColor)
         const backHand = new PIXI.Graphics()
-        backHand.circle(0, foreArmH + 0.4, 1.1).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
+        backHand.circle(0, foreArmH + 0.4, 0.95).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
         backFore.addChild(backForeG)
         backFore.addChild(backHand)
         backArm.addChild(backFore)
@@ -258,47 +261,56 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         if (ap.accessory === 'school_tie') {
           torsoG.rect(-headR * 0.95, torsoTop, headR * 1.9, 1.2).fill('#facc15')
         }
-        // ---- 家境派生细节 ----
-        // 衣摆/领口镶边：富裕=金边醒目，中产=细描边，贫困=洗白旧边。
-        const trimW = ap.wealthTier === 'high' ? 0.7 : 0.4
-        const trimAlpha = ap.wealthTier === 'high' ? 0.95 : ap.wealthTier === 'low' ? 0.6 : 0.7
-        torsoG
-          .moveTo(-headR * 0.8, torsoTop + torsoH - 0.4)
-          .lineTo(headR * 0.8, torsoTop + torsoH - 0.4)
-          .stroke({ width: trimW, color: ap.outfitTrim, alpha: trimAlpha, cap: 'round' })
-        if (ap.wealthTier === 'high') {
-          // 金色领缘 + 立体高光，凸显质感。
-          torsoG
-            .moveTo(-headR * 0.6, torsoTop + 0.4)
-            .lineTo(0, torsoTop + torsoH * 0.26)
-            .lineTo(headR * 0.6, torsoTop + 0.4)
-            .stroke({ width: 0.6, color: ap.outfitTrim, alpha: 0.9, cap: 'round' })
-          // 纽扣线
-          for (let bi = 0; bi < 3; bi++) {
-            const by = torsoTop + torsoH * (0.4 + bi * 0.18)
-            torsoG.circle(0, by, 0.35).fill({ color: ap.outfitTrim, alpha: 0.95 })
-          }
-        }
-        // 胸袋巾（西装/公文包 + 富裕）。
-        if (ap.hasPocketSquare) {
-          torsoG.poly([
-            -headR * 0.62, torsoTop + torsoH * 0.34,
-            -headR * 0.34, torsoTop + torsoH * 0.34,
-            -headR * 0.48, torsoTop + torsoH * 0.46,
-          ]).fill({ color: '#fef3c7' }).stroke({ width: 0.25, color: ap.outfitTrim })
-        }
-        // 补丁（贫困/留守）：膝部与衣身各一块异色方块 + 缝线。
-        if (ap.patched) {
-          const patch = (px: number, py: number, s: number) => {
-            torsoG.roundRect(px - s / 2, py - s / 2, s, s, 0.5).fill({ color: ap.outfitTrim, alpha: 0.85 })
-            torsoG.rect(px - s / 2, py - s / 2, s, s).stroke({ width: 0.2, color: '#475569', alpha: 0.6 })
-          }
-          patch(headR * 0.4, torsoTop + torsoH * 0.62, 1.9)
-          patch(-headR * 0.5, torsoTop + torsoH * 0.78, 1.5)
-        }
         torso.addChild(torsoG)
         body.addChild(torso)
         limbs.torso = torso
+
+        // ----- 家境装饰：富裕(金边西装/胸袋巾/胸针) ↔ 贫困(衣物补丁) -----
+        // 仅画在躯干层（只随呼吸轻微缩放，不随四肢摆动而脱节）。
+        const tier = tierRef.current
+        if (tier === 'wealthy') {
+          const goldA = '#e9c766'
+          const goldB = '#b8860b'
+          const lux = new PIXI.Graphics()
+          // 下摆金线
+          lux.moveTo(-headR * 0.8, torsoTop + torsoH - 0.5)
+            .lineTo(headR * 0.8, torsoTop + torsoH - 0.5)
+            .stroke({ width: 0.5, color: goldA, alpha: 0.9 })
+          // 领口金边（V 形翻领）
+          lux.moveTo(-headR * 0.58, torsoTop + 0.5)
+            .lineTo(0, torsoTop + torsoH * 0.3)
+            .lineTo(headR * 0.58, torsoTop + 0.5)
+            .stroke({ width: 0.55, color: goldA, alpha: 0.95 })
+          // 中轴双排金扣
+          lux.circle(-headR * 0.18, torsoTop + torsoH * 0.5, 0.42).fill(goldA)
+          lux.circle(headR * 0.18, torsoTop + torsoH * 0.5, 0.42).fill(goldA)
+          lux.circle(-headR * 0.18, torsoTop + torsoH * 0.72, 0.42).fill(goldA)
+          lux.circle(headR * 0.18, torsoTop + torsoH * 0.72, 0.42).fill(goldA)
+          // 左胸袋巾（白绸三角）
+          lux.poly([
+            -headR * 0.62, torsoTop + torsoH * 0.34,
+            -headR * 0.26, torsoTop + torsoH * 0.34,
+            -headR * 0.44, torsoTop + torsoH * 0.52,
+          ]).fill('#f8fafc').stroke({ width: 0.25, color: goldB })
+          // 右胸金质胸针
+          lux.circle(headR * 0.5, torsoTop + torsoH * 0.32, 0.55).fill(goldA).stroke({ width: 0.2, color: goldB })
+          body.addChild(lux)
+        } else if (tier === 'poor') {
+          const patchFill = '#9ca3af'
+          const stitch = '#4b5563'
+          const patch = new PIXI.Graphics()
+          // 躯干右下补丁
+          patch.roundRect(headR * 0.2, torsoTop + torsoH * 0.5, 2.1, 1.9, 0.4)
+            .fill({ color: patchFill, alpha: 0.92 })
+            .stroke({ width: 0.3, color: stitch })
+          patch.rect(headR * 0.2, torsoTop + torsoH * 0.5, 2.1, 0.18).fill({ color: stitch, alpha: 0.55 })
+          patch.rect(headR * 0.2, torsoTop + torsoH * 0.5 + 1.7, 2.1, 0.18).fill({ color: stitch, alpha: 0.55 })
+          // 左肩补丁
+          patch.roundRect(-headR * 0.78, torsoTop + 0.6, 1.7, 1.5, 0.35)
+            .fill({ color: patchFill, alpha: 0.85 })
+            .stroke({ width: 0.28, color: stitch })
+          body.addChild(patch)
+        }
 
         // ----- 前腿 -----
         const frontLegX = -headR * 0.3
@@ -359,15 +371,16 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
         const frontForeG = new PIXI.Graphics()
         paintLimb(frontForeG, limbW * 0.95, foreArmH, sleeveColor)
         const frontHand = new PIXI.Graphics()
-        frontHand.circle(0, foreArmH + 0.4, 1.1).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
-        // 富裕：前臂腕部金色腕表。
-        if (ap.hasWatch) {
-          frontForeG.rect(-limbW * 0.55, foreArmH - 1.4, limbW * 1.1, 1.0).fill({ color: '#1f2937' })
-          frontForeG.circle(0, foreArmH - 0.9, 0.9).fill({ color: ap.outfitTrim }).stroke({ width: 0.2, color: '#92400e' })
-          frontForeG.circle(0, foreArmH - 0.9, 0.4).fill({ color: '#fffbeb', alpha: 0.85 })
-        }
+        frontHand.circle(0, foreArmH + 0.4, 0.95).fill(ap.skinFill).stroke({ width: 0.2, color: ap.skinShade })
         frontFore.addChild(frontForeG)
         frontFore.addChild(frontHand)
+        // 富裕：前腕金表
+        if (tierRef.current === 'wealthy') {
+          const watch = new PIXI.Graphics()
+          watch.roundRect(-limbW * 0.7, foreArmH - 1.1, limbW * 1.4, 0.7, 0.3).fill('#e9c766').stroke({ width: 0.2, color: '#b8860b' })
+          watch.circle(0, foreArmH - 0.75, 0.55).fill('#fef9e7').stroke({ width: 0.2, color: '#b8860b' })
+          frontFore.addChild(watch)
+        }
         frontArm.addChild(frontFore)
         body.addChild(frontArm)
 
@@ -634,6 +647,16 @@ export default function PixiCharacter({ a, progress, ariaLabel }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a])
+
+  // 家境层级变化：同样重建人物（重画服饰装饰）。
+  useEffect(() => {
+    tierRef.current = tier ?? 'middle'
+    const layers = layersRef.current as any
+    if (layers && typeof layers.rebuild === 'function') {
+      layers.rebuild()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier])
 
   return (
     <div

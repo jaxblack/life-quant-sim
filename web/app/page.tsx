@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import PixiCharacter from '../components/PixiCharacter'
-import { appearanceForStageId } from './character'
+import { appearanceForStageId, wealthTierForFamilyId } from './character'
 
 type LifeStage = {
   id: string
@@ -144,7 +144,8 @@ const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f
 
 // 阶段角色舞台: 背景 / 地面用 CSS 渲染, 人物走路 / 成长动画交给 WebGL (PixiCharacter).
 function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string }) {
-  const a = appearanceForStageId(stageId, familyId)
+  const a = appearanceForStageId(stageId)
+  const tier = wealthTierForFamilyId(familyId)
   // 姿态补助 class: stooped 高龄、bouncy 童年。 leaning-fwd / upright 不额外加 class.
   const poseClass =
     a.posture === 'stooped' ? 'lqs-pose-stooped' :
@@ -159,6 +160,7 @@ function CharacterStage({ stageId, age, progress, stageName, regionName, familyN
       <PixiCharacter
         a={a}
         progress={progress}
+        tier={tier}
         ariaLabel={`在 ${regionName} 出生、来自 ${familyName}, ${age} 岁 · ${stageName} 阶段的小人沿时间轴行走动画: ${a.caption}`}
       />
     </div>
@@ -1775,22 +1777,28 @@ export default function SimPage() {
                   data-trend={c.trend}
                   data-score-band={scoreBand}
                   style={{
+                    padding: 10,
                     border: `1px solid ${border}`,
                     background: bg,
+                    borderRadius: 10,
+                    display: 'grid',
+                    gap: 6,
+                    transition: 'background 200ms ease, border-color 200ms ease',
                   }}
                 >
-                  <div className="lqs-status-top">
-                    <span className="lqs-status-label">{c.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{c.label}</span>
                     <span
                       className="lqs-status-delta"
                       aria-label={`${c.trend === 'up' ? '上涨' : c.trend === 'down' ? '下跌' : '持平'} ${deltaText}`}
-                      style={{ color }}
+                      style={{ color, fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
-                      <span aria-hidden>{arrow}</span>
+                      <span style={{ fontSize: 13 }}>{arrow}</span>
                       <span>{deltaText}</span>
                     </span>
                   </div>
-                  <div className="lqs-status-mid">
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                    <div className="lqs-status-value" title={c.value}>{c.value}</div>
                     <div
                       className="lqs-status-score"
                       title={`当前指标值: ${c.score} ${c.unit}（与上一时间步比较 ${deltaText}）`}
@@ -1798,7 +1806,6 @@ export default function SimPage() {
                       {c.score}
                       <span>{c.unit}</span>
                     </div>
-                    <div className="lqs-status-value" title={c.value}>{c.value}</div>
                   </div>
                   <div className="lqs-status-hint" title={c.hint}>{c.hint}</div>
                 </div>
@@ -1826,7 +1833,7 @@ export default function SimPage() {
               stageName={stage.name}
               regionName={region.name}
               familyName={family.name}
-              familyId={family.id}
+              familyId={familyId}
             />
             <div
               style={{
