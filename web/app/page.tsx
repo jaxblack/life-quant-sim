@@ -151,7 +151,7 @@ const STAGE_COLORS = ['#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#f
 // 走路 / 成长动画改由 PixiJS (WebGL) 渲染，见 components/PixiCharacter。
 
 // 阶段角色舞台: 背景 / 地面用 CSS 渲染, 人物走路 / 成长动画交给 WebGL (PixiCharacter).
-function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId, happiness, lifeMeaning, deathAge, deathCause }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string; happiness: number[]; lifeMeaning: number; deathAge: number; deathCause?: DeathCause }) {
+function CharacterStage({ stageId, age, progress, stageName, regionName, familyName, familyId, happiness, lifeMeaning, deathAge, deathCause, flashLabel, flashKey }: { stageId: string; age: number; progress: number; stageName: string; regionName: string; familyName: string; familyId: string; happiness: number[]; lifeMeaning: number; deathAge: number; deathCause?: DeathCause; flashLabel?: string; flashKey?: number }) {
   const a = appearanceForStageId(stageId)
   const tier = wealthTierForFamilyId(familyId)
   // 姿态补助 class: stooped 高龄、bouncy 童年。 leaning-fwd / upright 不额外加 class.
@@ -170,6 +170,13 @@ function CharacterStage({ stageId, age, progress, stageName, regionName, familyN
           ? `享年 ${Math.round(deathAge)} 岁 · 人生意义 ${fmt1(lifeMeaning)}${deathShort ? ' · ' + deathShort : ''}`
           : `${age} 岁 · ${age <= 5 ? '未开智 · ' : ''}${stageName} · ${a.caption}`}
       </div>
+      {/* 抽中的卡文案浮在图像上方, 停留约 1 秒淡出, 让"抽到哪张"更直观。 */}
+      {flashLabel && (
+        <div className="lqs-stage-flash" key={flashKey}>
+          <span className="lqs-stage-flash-tag">🎴 抽中</span>
+          <span className="lqs-stage-flash-name">{flashLabel}</span>
+        </div>
+      )}
       <div className="lqs-character-ground" />
       <PixiCharacter
         a={a}
@@ -1605,6 +1612,7 @@ export default function SimPage() {
     if (decisionsRef.current.has(id)) return
     advancingRef.current = true
     setFlashPickId(id)
+    flashCardFloat(id)
     addDecision(id)
     window.setTimeout(() => {
       advanceYear()
@@ -1648,6 +1656,16 @@ export default function SimPage() {
   const [showAllCards, setShowAllCards] = useState<boolean>(false)
   // 刚被抽中的卡 id：用于给该卡播放一段“抽中”高亮脉冲动画（自动播放时尤其需要，否则看不清抽到哪张）。
   const [flashPickId, setFlashPickId] = useState<string | null>(null)
+  // 抽中的卡文案浮在角色图像上方，停留约 1 秒后淡出（独立于翻页节奏，靠自带定时器清除）。
+  const [floatPick, setFloatPick] = useState<{ label: string; key: number } | null>(null)
+  const floatTimerRef = useRef<number | undefined>(undefined)
+  const flashCardFloat = (id: string) => {
+    const c = CHOICE_BY_ID.get(id)
+    if (!c) return
+    if (floatTimerRef.current !== undefined) window.clearTimeout(floatTimerRef.current)
+    setFloatPick({ label: `${c.emoji} ${c.name}`, key: Date.now() })
+    floatTimerRef.current = window.setTimeout(() => setFloatPick(null), 1100)
+  }
   const handYearRef = useRef<number>(-1)
   const decisionsRef = useRef(decisions)
   useEffect(() => {
@@ -2013,6 +2031,7 @@ export default function SimPage() {
       if (candidates.length > 0) {
         const pick = candidates[Math.floor(Math.random() * candidates.length)]
         setFlashPickId(pick) // 触发“抽中”脉冲动画
+        flashCardFloat(pick) // 抽中文案浮到角色图像上方
         addDecision(pick)
       }
       advanceTimer = window.setTimeout(() => advanceYear(), showMs)
@@ -2949,6 +2968,8 @@ export default function SimPage() {
               lifeMeaning={lifeMeaningTotal}
               deathAge={deathAge}
               deathCause={deathInfo.cause}
+              flashLabel={floatPick?.label}
+              flashKey={floatPick?.key}
             />
             <div
               style={{
@@ -3240,6 +3261,7 @@ export default function SimPage() {
           {/* 当前阶段即将错过的人生窗口 · 机会成本 */}
           <section
             aria-labelledby="opportunity-cost-heading"
+            className="lqs-gacha-section"
             style={{
               display: 'grid',
               gap: 12,
@@ -3256,7 +3278,7 @@ export default function SimPage() {
               >
                 人生抽卡 · 每岁四选一 · 感情线 ∥ 事业线
               </h2>
-              <p style={{ margin: 0, color: '#6b7280', fontSize: 13, lineHeight: 1.7 }}>
+              <p className="lqs-hide-mobile" style={{ margin: 0, color: '#6b7280', fontSize: 13, lineHeight: 1.7 }}>
                 以当前年龄 <strong>{displayAge} 岁</strong> 为节点，每岁随机发 4 张人生卡牌（感情线 / 事业线），
                 <strong>四选一</strong>抓住当下的机会窗口；
                 也可一键随机。自动播放时会替你自动随机选牌，从 0 岁一路开到人生终局。
@@ -3266,6 +3288,7 @@ export default function SimPage() {
             {/* 人生抉择 · 感情线 ∥ 事业线（并列两栏，cost/gain 在对应年龄自己选） */}
             <div style={{ display: 'grid', gap: 10 }}>
               <div
+                className="lqs-hide-mobile"
                 style={{
                   border: '1px solid #c7d2fe',
                   background: 'linear-gradient(180deg,#eef2ff,#ffffff)',

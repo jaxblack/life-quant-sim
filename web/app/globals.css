@@ -725,6 +725,25 @@ video {
   .lqs-sim-page[data-mp='2'] .lqs-sim-aside {
     display: none;
   }
+  /* 移动端把"卡牌/抽卡"提到首屏：展平左右两列, 用 order 重排为
+     导航 → 角色图像(含抽中浮层) → 抽卡区 → 其余明细。 */
+  .lqs-sim-content .lqs-sim-col-left,
+  .lqs-sim-content .lqs-sim-col-right {
+    display: contents;
+  }
+  .lqs-sim-content .lqs-mobile-nav {
+    order: -3;
+  }
+  .lqs-sim-content .lqs-timeline {
+    order: -2;
+  }
+  .lqs-sim-content .lqs-gacha-section {
+    order: -1;
+  }
+  /* 移动端隐藏冗长的说明文案, 让手牌更贴近首屏。 */
+  .lqs-hide-mobile {
+    display: none !important;
+  }
 }
 
 /* ----------------------- 抽中卡高亮动画 ----------------------- */
@@ -775,3 +794,64 @@ video {
     animation: none;
   }
 }
+
+/* ----------------------- 抽中卡文案浮层 (角色图像上方) ----------------------- */
+/* 抽中的卡名浮在角色图像中上部, 升起→停留→淡出, 约 1.1s, 让"抽到哪张"在图上也可见。 */
+@keyframes lqsStageFloat {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.9);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(1);
+  }
+}
+.lqs-stage-flash {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 88%;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(245, 158, 11, 0.7);
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.32);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: lqsStageFloat 1.1s ease-out forwards;
+}
+.lqs-stage-flash-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: #f59e0b;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.lqs-stage-flash-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lqs-stage-flash {
+    animation: none;
+    opacity: 1;
+  }
+}
+
