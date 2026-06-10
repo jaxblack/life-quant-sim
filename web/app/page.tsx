@@ -1167,16 +1167,17 @@ function lerp1(x: number, x0: number, x1: number, y0: number, y1: number): numbe
 
 function wealthScoreAt(age: number, familyId: string, bgWealth: number): number {
   const familyBase =
-    familyId === 'wealthy' ? 400 : familyId === 'middle' ? 60 : familyId === 'working' ? 12 : 3
+    familyId === 'wealthy' ? 260 : familyId === 'middle' ? 40 : familyId === 'working' ? 8 : 2
   const seg = (from: number, to: number, slope: number) =>
     Math.max(0, Math.min(age, to) - from) * slope
   let active = 0
   if (age >= 22) {
-    active = seg(22, 30, 3) + seg(30, 45, 12) + seg(45, 58, 18) + seg(58, 68, 5)
-    if (age > 68) active -= (age - 68) * 9
+    // #4 防爆：职业生涯资产积累斜率整体下调约 60%，避免中产到退休就攒出几百万。
+    active = seg(22, 30, 1.2) + seg(30, 45, 5) + seg(45, 58, 7) + seg(58, 68, 2)
+    if (age > 68) active -= (age - 68) * 4
   }
   const slopeBonus =
-    familyId === 'wealthy' ? active * 0.45 : familyId === 'middle' ? active * 0.12 : 0
+    familyId === 'wealthy' ? active * 0.4 : familyId === 'middle' ? active * 0.1 : 0
   // 不再钳到 >=0：家境差 + 选择拖累时资产可为负（负债）。
   return Math.round(familyBase + active + slopeBonus + bgWealth * 6)
 }
@@ -1205,6 +1206,8 @@ function educationScoreAt(age: number, bgEducation: number): number {
   if (age >= 23) s += Math.min(3, age - 22) * 4
   if (age >= 26) s += Math.min(34, age - 25) * 0.35
   if (age >= 60) s -= (age - 60) * 0.2
+  // #4 防爆：学历基线整体压到 ~0.82，避免单凭年龄就把学历顶到 100。
+  s *= 0.82
   s += bgEducation * 1.5
   // 钳制移到 metricsAt 统一处理（允许负数）。
   return s
@@ -1240,8 +1243,8 @@ const TALENT_EFFECTS: Record<Talent, DimEffect> = {
   social: { education: 0, identity: 10, body: 1, wealthWan: 6 },
   expression: { education: 2, identity: 9, body: 1, wealthWan: 4 },
   discipline: { education: 6, identity: 2, body: 5, wealthWan: 0 },
-  tech_esports: { education: 8, identity: 2, body: 0, wealthWan: 22 },
-  business: { education: 2, identity: 5, body: 0, wealthWan: 40 },
+  tech_esports: { education: 8, identity: 2, body: 0, wealthWan: 12 },
+  business: { education: 2, identity: 5, body: 0, wealthWan: 18 },
 }
 
 // 出身家庭 → 四维先天基底：家境好底子高，家境差则学历/身份/身体/资产都低（可为负）。
@@ -1274,6 +1277,14 @@ function clampScore(v: number): number {
   return Math.max(-100, Math.min(100, v))
 }
 
+// #4 防爆：柔性压缩（边际递减）——膝点以下保持原值，膝点以上按系数收敛，
+// 让"基线 + 天赋 + 家境 + 抉择"相加后不再轻易顶到 100，高位之间仍保留区分度。
+function softCap(v: number): number {
+  const knee = 55
+  if (v <= knee) return v
+  return knee + (v - knee) * 0.55
+}
+
 // ----------------------- 人生抉择系统：cost / gain / 隐藏心情（让模拟变成游戏）-----------------------
 // 每个选择都有"代价"(cost)与"收益"(gain)：代价从选择当年起生效，收益在 delayYears 年后兑现。
 // 心情(mood)是隐藏分——只画成多巴胺曲线，不直接显示数字；过低会中途离世。
@@ -1290,13 +1301,19 @@ function sampleN<T>(arr: T[], n: number): T[] {
   return out
 }
 
+// #4 防爆：把一辈子累积的抉择影响压一压——
+//  - 学历/身份/身体加成整体缩放 DECISION_DELTA_SCALE，避免几十张牌把指标顶满；
+//  - 资产乘子向 1 收敛（阻尼），抑制几十个 ×1.x 连乘出的复利爆炸。
+const DECISION_DELTA_SCALE = 0.55
+const WEALTH_MUL_DAMP = 0.55
+
 // 把一个 cost / gain 片段折叠进总 debuff（乘子相乘、加成相加）。
 function applyPiece(d: LifeDebuff, p?: Partial<LifeDebuff>) {
   if (!p) return
-  if (p.wealthMul != null) d.wealthMul *= p.wealthMul
-  if (p.bodyDelta != null) d.bodyDelta += p.bodyDelta
-  if (p.eduDelta != null) d.eduDelta += p.eduDelta
-  if (p.identityDelta != null) d.identityDelta += p.identityDelta
+  if (p.wealthMul != null) d.wealthMul *= 1 + (p.wealthMul - 1) * WEALTH_MUL_DAMP
+  if (p.bodyDelta != null) d.bodyDelta += p.bodyDelta * DECISION_DELTA_SCALE
+  if (p.eduDelta != null) d.eduDelta += p.eduDelta * DECISION_DELTA_SCALE
+  if (p.identityDelta != null) d.identityDelta += p.identityDelta * DECISION_DELTA_SCALE
   if (p.moodDelta != null) d.moodDelta += p.moodDelta
 }
 
@@ -1313,6 +1330,37 @@ function decisionEffectAt(age: number, ids: Iterable<string>): LifeDebuff {
     if (age >= c.ageStart + c.delayYears) applyPiece(d, c.gain)
   })
   return d
+}
+
+// #3 多巴胺边际递减（享乐适应 / hedonic adaptation，双向）：
+// 把每个抉择的“心情”按生效年龄排序逐一结算。正向收益只有超过历史最高刺激(posPeak)的部分才真正抬升多巴胺，
+// 随后 posPeak 抬到这次的高度——同档位的快乐第二次几乎不再有效，必须更大的刺激才能再涨。
+// 负向心情同理对“苦难”也会适应：只有比历史最痛(negPeak)更糟的部分才继续压低，
+// 否则反复的小挫折不会无限叠加把人拖死（避免随机垃圾牌把心情打成净负的死亡螺旋）。
+function moodDeltaAt(age: number, ids: Iterable<string>): number {
+  const events: { effAge: number; m: number }[] = []
+  Array.from(ids).forEach((id) => {
+    const c = CHOICE_BY_ID.get(id)
+    if (!c || age < c.ageStart) return
+    if (c.cost?.moodDelta != null) events.push({ effAge: c.ageStart, m: c.cost.moodDelta })
+    if (age >= c.ageStart + c.delayYears && c.gain?.moodDelta != null)
+      events.push({ effAge: c.ageStart + c.delayYears, m: c.gain.moodDelta })
+  })
+  events.sort((a, b) => a.effAge - b.effAge)
+  let total = 0
+  let posPeak = 0 // 历史最高一次性正向刺激
+  let negPeak = 0 // 历史最痛一次性负向刺激（绝对值）
+  events.forEach((e) => {
+    if (e.m > 0) {
+      total += Math.max(0, e.m - posPeak)
+      posPeak = Math.max(posPeak, e.m)
+    } else if (e.m < 0) {
+      const mag = -e.m
+      total -= Math.max(0, mag - negPeak)
+      negPeak = Math.max(negPeak, mag)
+    }
+  })
+  return total
 }
 
 // 把一个 cost / gain 片段渲染成短标签（心情=隐藏分的相对增减，不暴露绝对值）。
@@ -1356,9 +1404,9 @@ function metricsAt(age: number, ctx: MetricsCtx) {
   const tb = talentBonus(ctx.talents ?? [])
   const fd = FAMILY_DIM_EFFECTS[ctx.familyId] ?? ZERO_DIM
   const wealth = wealthScoreAt(age, ctx.familyId, ctx.bg.wealth) * d.wealthMul + tb.wealthWan + fd.wealthWan
-  const identity = clampScore(identityScoreAt(age, ctx.regionBase, ctx.bg.identity) + d.identityDelta + tb.identity + fd.identity)
-  const education = clampScore(educationScoreAt(age, ctx.bg.education) + d.eduDelta + tb.education + fd.education)
-  const body = clampScore(bodyScoreAt(age, ctx.bg.body, ctx.gender) + d.bodyDelta + tb.body + fd.body)
+  const identity = clampScore(softCap(identityScoreAt(age, ctx.regionBase, ctx.bg.identity) + d.identityDelta + tb.identity + fd.identity))
+  const education = clampScore(softCap(educationScoreAt(age, ctx.bg.education) + d.eduDelta + tb.education + fd.education))
+  const body = clampScore(softCap(bodyScoreAt(age, ctx.bg.body, ctx.gender) + d.bodyDelta + tb.body + fd.body))
   return { wealth, wealthN: wealthNorm(wealth), identity, education, body }
 }
 
@@ -1376,11 +1424,12 @@ function fmt1(v: number): number {
 // 资产与身体长期双低 → 心情被进一步拖低（贫病交加的精神内耗）。
 function happinessAt(age: number, ctx: MetricsCtx): number {
   const m = metricsAt(age, ctx)
-  const d = ctx.choices ? decisionEffectAt(age, ctx.choices) : NO_DEBUFF
+  // #3 心情用“边际递减”的多巴胺结算，而非简单累加所有 moodDelta。
+  const mood = ctx.choices ? moodDeltaAt(age, ctx.choices) : 0
   const idN = Math.max(0, m.identity)
   const eduN = Math.max(0, m.education)
   const bodyN = Math.max(0, m.body)
-  let h = 0.3 * bodyN + 0.25 * idN + 0.25 * m.wealthN + 0.2 * eduN + d.moodDelta
+  let h = 0.3 * bodyN + 0.25 * idN + 0.25 * m.wealthN + 0.2 * eduN + mood
   // 资产 + 身体双低的精神内耗惩罚（心情是隐藏分，这里直接压低）。
   if (m.wealthN < 28 && m.body < 38) {
     h -= (28 - m.wealthN) * 0.25 + (38 - m.body) * 0.25
@@ -1487,7 +1536,8 @@ export default function SimPage() {
     }, 500)
   }
   const [selectedTalents, setSelectedTalents] = useState<Talent[]>(
-    TALENTS.map((t) => t.id)
+    // #5 默认只给 2 个天赋（不再全选），避免一上来四维就被顶满；用确定值避免 SSR 水合不一致。
+    ['academic', 'social']
   )
   const [showMissed, setShowMissed] = useState<boolean>(false)
   // 新增：教养氛围过滤（多选）与感情线 / 事业线 tab。
@@ -1517,9 +1567,8 @@ export default function SimPage() {
   const scoreBandOf = (score: number) =>
     score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low'
 
-  // —————— 抽卡机制：每过一岁出 3 张事件卡，每年 2 次单卡重随，也可一键随机选中 ——————
+  // —————— 抽卡机制：每过一岁出 4 张事件卡，四选一（不再重随），也可一键随机选中 ——————
   const [hand, setHand] = useState<string[]>([])
-  const [rerollsLeft, setRerollsLeft] = useState<number>(2)
   const [showAllCards, setShowAllCards] = useState<boolean>(false)
   const handYearRef = useRef<number>(-1)
   const decisionsRef = useRef(decisions)
@@ -1541,28 +1590,17 @@ export default function SimPage() {
         reqMet(c),
     )
 
-  // 进入新的一年 → 重新发 3 张牌、重置 2 次重随机会。人死后不再发牌。
+  // 进入新的一年 → 重新发 4 张牌。人死后不再发牌。
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
     if (displayAge >= deathAgeRef.current) {
       setHand([])
-      setRerollsLeft(0)
       return
     }
-    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 3))
-    setRerollsLeft(2)
+    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 4))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayAge])
-
-  const rerollCard = (index: number) => {
-    if (rerollsLeft <= 0) return
-    const pool = poolAt(displayAge, hand)
-    if (pool.length === 0) return
-    const pick = pool[Math.floor(Math.random() * pool.length)].id
-    setHand((prev) => prev.map((id, i) => (i === index ? pick : id)))
-    setRerollsLeft((n) => n - 1)
-  }
 
   // 一键随机：从当前手牌里随机抽一张尚未选中的，选中并进入下一年。
   const oneClickRandom = () => {
@@ -1613,15 +1651,17 @@ export default function SimPage() {
         style={{
           textAlign: 'left',
           cursor: locked ? 'not-allowed' : 'pointer',
-          border: `1px solid ${selected ? col.color : col.border}`,
-          background: selected ? 'white' : 'rgba(255,255,255,0.55)',
+          border: `${selected ? 2 : 1}px solid ${selected ? col.color : col.border}`,
+          background: selected ? col.bg : 'rgba(255,255,255,0.55)',
           borderRadius: 10,
           padding: '8px 10px',
           display: 'grid',
           gap: 4,
           opacity: locked ? 0.5 : 1,
           fontFamily: 'inherit',
-          boxShadow: selected ? `0 0 0 1px ${col.color}` : 'none',
+          boxShadow: selected ? `0 0 0 3px ${col.color}40, 0 6px 16px ${col.color}33` : 'none',
+          transform: selected ? 'translateY(-1px)' : 'none',
+          transition: 'box-shadow .15s ease, transform .15s ease, border-color .15s ease',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -1640,6 +1680,11 @@ export default function SimPage() {
           <span style={{ color: '#6b7280', fontSize: 11 }}>
             {c.ageStart}-{c.ageEnd}岁{c.delayYears > 0 ? ` · ${c.delayYears}年后兑现` : ''}
           </span>
+          {selected && (
+            <span style={{ fontSize: 10, color: 'white', background: col.color, padding: '1px 7px', borderRadius: 999, fontWeight: 700 }}>
+              ✓ 已选中
+            </span>
+          )}
           {selected && (
             <span style={{ color: matured ? '#047857' : '#b45309', fontSize: 11, fontWeight: 700 }}>
               {matured ? '✓ 收益已兑现' : '投入中…'}
@@ -1688,21 +1733,27 @@ export default function SimPage() {
   // 🎲 随机出身：随机出生地域 / 出身家庭 / 性别 / 个人天赋 / 教养氛围，并把人生重置到 0 岁重新开局。
   const randomizeOrigin = () => {
     const pickOne = <T,>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)]
-    const pickSome = <T,>(arr: readonly T[], min: number) => {
+    // #5 取 [lo, hi] 个不重复元素（天赋 / 氛围都只给两三个）。
+    const pickRange = <T,>(arr: readonly T[], lo: number, hi: number) => {
       const shuffled = [...arr].sort(() => Math.random() - 0.5)
-      const n = min + Math.floor(Math.random() * (arr.length - min + 1))
-      return shuffled.slice(0, Math.max(min, n))
+      const n = lo + Math.floor(Math.random() * (hi - lo + 1))
+      return shuffled.slice(0, n)
     }
-    setRegionId(pickOne(REGIONS).id)
+    // #5 地域：以境内为主，海外华人身份为低概率（约 15%），不再五五开。
+    const pickRegion = () => {
+      const overseas = REGIONS.filter((r) => r.id.startsWith('overseas'))
+      const domestic = REGIONS.filter((r) => !r.id.startsWith('overseas'))
+      return Math.random() < 0.15 && overseas.length ? pickOne(overseas) : pickOne(domestic)
+    }
+    setRegionId(pickRegion().id)
     setFamilyId(pickOne(FAMILIES).id)
     setGender(Math.random() < 0.5 ? 'male' : 'female')
-    setSelectedTalents(pickSome(TALENTS, 1).map((t) => t.id))
-    setFamilyBg(pickSome(FAMILY_BACKGROUNDS, 1).map((b) => b.id))
+    setSelectedTalents(pickRange(TALENTS, 2, 3).map((t) => t.id))
+    setFamilyBg(pickRange(FAMILY_BACKGROUNDS, 2, 3).map((b) => b.id))
     // 重新投胎：清空抉择、从 0 岁开始、自动播放重新开局。
     setDecisions(new Set())
     handYearRef.current = -1
     setHand([])
-    setRerollsLeft(2)
     setAge(0)
     setIsTimelinePlaying(true)
   }
@@ -1715,7 +1766,6 @@ export default function SimPage() {
     setDecisions(new Set())
     handYearRef.current = -1
     setHand([])
-    setRerollsLeft(2)
     setAge(0)
   }
 
@@ -2210,16 +2260,10 @@ export default function SimPage() {
   }, [])
 
   const visibleWindows = useMemo(() => {
-    // 所有人生窗口已统一改为抽卡机制（见下方卡牌）。这里返回空列表，旧的只读“机会成本清单”不再展示。
-    return [] as OpportunityWindow[]
-    // eslint-disable-next-line no-unreachable, react-hooks/exhaustive-deps
-    const byTalent = windowDb.all.filter((w) => {
-      if (selectedTalents.length === 0) return false
-      if (w.talentMode === 'all') {
-        return w.talents.every((t) => selectedTalents.includes(t))
-      }
-      return w.talents.some((t) => selectedTalents.includes(t))
-    })
+    // 人生事件窗口（机会成本视图）：按年龄展示当前 / 即将到来 / 刚错过的人生窗口。
+    // 不再以天赋硬筛——大多数窗口是人人都会面对的人生路口（升学 / 婚育 / 购房 / 考公 / 移民…），
+    // 全部按年龄 + 地域展示，保证“事件窗口足够丰富”。
+    const byTalent = windowDb.all
     const byRegion = byTalent.filter(
       (w) => !w.regions || w.regions.includes(regionId)
     )
@@ -2999,11 +3043,11 @@ export default function SimPage() {
                 id="opportunity-cost-heading"
                 style={{ fontSize: 18, margin: 0 }}
               >
-                人生抽卡 · 每岁三选一 · 感情线 ∥ 事业线
+                人生抽卡 · 每岁四选一 · 感情线 ∥ 事业线
               </h2>
               <p style={{ margin: 0, color: '#6b7280', fontSize: 13, lineHeight: 1.7 }}>
-                以当前年龄 <strong>{displayAge} 岁</strong> 为节点，每岁随机发 3 张人生卡牌（感情线 / 事业线），
-                <strong>三选一</strong>抓住当下的机会窗口；每年有 <strong>2 次重随</strong>机会，
+                以当前年龄 <strong>{displayAge} 岁</strong> 为节点，每岁随机发 4 张人生卡牌（感情线 / 事业线），
+                <strong>四选一</strong>抓住当下的机会窗口；
                 也可一键随机。自动播放时会替你自动随机选牌，从 0 岁一路开到人生终局。
               </p>
             </div>
@@ -3084,9 +3128,6 @@ export default function SimPage() {
                     🎴 本年度抽卡 · {displayAge} 岁
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>
-                      剩余重随 {rerollsLeft}/2
-                    </span>
                     <button
                       type="button"
                       onClick={oneClickRandom}
@@ -3144,27 +3185,9 @@ export default function SimPage() {
                     {hand.map((id, i) => {
                       const c = CHOICE_BY_ID.get(id)
                       if (!c) return null
-                      const selected = decisions.has(id)
                       return (
-                        <div key={`${id}-${i}`} style={{ display: 'grid', gap: 6 }}>
+                        <div key={`${id}-${i}`} style={{ display: 'grid' }}>
                           {renderChoiceCard(c, pickCard)}
-                          <button
-                            type="button"
-                            onClick={() => rerollCard(i)}
-                            disabled={rerollsLeft <= 0 || selected}
-                            style={{
-                              fontSize: 12,
-                              padding: '4px 0',
-                              border: '1px dashed #c4b5fd',
-                              borderRadius: 8,
-                              background: rerollsLeft <= 0 || selected ? '#f3f4f6' : 'white',
-                              color: rerollsLeft <= 0 || selected ? '#9ca3af' : '#7c3aed',
-                              cursor: rerollsLeft <= 0 || selected ? 'not-allowed' : 'pointer',
-                              fontFamily: 'inherit',
-                            }}
-                          >
-                            {selected ? '已选中' : rerollsLeft <= 0 ? '🔁 重随已用完' : '🔁 重随'}
-                          </button>
                         </div>
                       )
                     })}
