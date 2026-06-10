@@ -1141,6 +1141,67 @@ const OPPORTUNITY_WINDOWS: OpportunityWindow[] = [
   },
 ]
 
+// #2 窗口 ↔ 抽卡关联表：把每个"机会窗口"映射到抽卡池里若干张主题相关的卡。
+// 作用：① 窗口激活当年，发牌时保证至少有一张关联卡进手牌（窗口可被"抓住"）；
+//       ② 卡片上显示"🎯 关联窗口"徽标；③ 窗口面板显示"本年可抽到 / 已把握"。
+// 仅映射到已存在的卡 id；未覆盖的窗口不显示关联(可后续补)。
+const WINDOW_CARD_LINKS: Record<string, string[]> = {
+  art_child_training: ['learn_instrument', 'painting_class', 'art_exam'],
+  sports_youth_pipeline: ['sports_team', 'swimming'],
+  child_performer: ['school_performance', 'kindergarten_star'],
+  esports_pro: ['gaming'],
+  body_peak: ['fitness', 'marathon'],
+  first_love: ['first_love', 'puppy_love', 'campus_love'],
+  fresh_grad: ['internship', 'big_tech_offer', 'return_offer', 'prep_interview'],
+  civil_servant_age: ['civil_service', 'state_owned', 'teacher_job'],
+  career_choice: ['job_hop', 'career_switch', 'startup'],
+  study_abroad: ['study_abroad', 'go_abroad_work'],
+  startup_window: ['startup', 'college_startup'],
+  first_marriage_child: ['marriage', 'have_child', 'flash_marriage', 'naked_marriage'],
+  mortgage_leverage: ['buy_house', 'second_house'],
+  academic_tenure: ['phd', 'grad_school', 'kaoyan_win'],
+  campus_love: ['campus_love', 'graduation_breakup'],
+  breakup_window: ['breakup_heartbreak', 'graduation_breakup'],
+  marriage_commitment: ['marriage', 'propose', 'maintain_love'],
+  infidelity_risk: ['affair', 'toxic_love'],
+  immigration_canada: ['go_abroad_work', 'study_abroad'],
+  immigration_australia: ['go_abroad_work', 'study_abroad'],
+  immigration_singapore: ['go_abroad_work', 'study_abroad'],
+  class_jump_overseas: ['go_abroad_work'],
+  family_trust_setup: ['financial_freedom', 'invest'],
+  offshore_asset_allocation: ['invest', 'stock_market'],
+  wealth_inheritance: ['financial_freedom', 'second_house'],
+  second_career_founder: ['career_switch', 'startup', 'midlife_reinvent'],
+  angel_investor_advisor: ['angel_investor', 'invest'],
+  author_thought_leader: ['write_novel', 'become_influencer', 'write_memoir'],
+  public_office_legacy: ['promotion', 'networking'],
+  p_to_m: ['promotion', 'office_politics'],
+  gaokao_migration: ['gaokao_grind', 'gaokao_win'],
+  junior_school_choice: ['zhongkao_grind', 'key_highschool'],
+  high_school_choice: ['key_highschool', 'vocational_school'],
+  premarital_contract_design: ['bride_price', 'naked_marriage'],
+  parent_companionship_childhood: ['accompany_kid', 'breastfed'],
+  adolescent_attachment_repair: ['see_counselor', 'rebel_phase'],
+  late_remarriage: ['blind_date', 'divorce'],
+  extramarital_risk_midlate: ['affair'],
+  end_of_life_planning: ['write_memoir', 'buy_insurance'],
+  charity_foundation_legacy: ['volunteer'],
+  spiritual_practice_deepening: ['meditation', 'religion_faith'],
+}
+
+// 反向索引：卡 id → 它所属的窗口（title 用于卡片徽标）。一张卡只取首个命中的窗口。
+const CARD_TO_WINDOW: Map<string, { windowId: string; title: string }> = (() => {
+  const m = new Map<string, { windowId: string; title: string }>()
+  for (const w of OPPORTUNITY_WINDOWS) {
+    const cards = WINDOW_CARD_LINKS[w.id]
+    if (!cards) continue
+    for (const cid of cards) {
+      if (!m.has(cid)) m.set(cid, { windowId: w.id, title: w.title })
+    }
+  }
+  return m
+})()
+
 type OpportunityStatus = 'upcoming' | 'current' | 'closing' | 'missed'
 
 function classifyWindow(age: number, win: OpportunityWindow): OpportunityStatus {
@@ -1364,14 +1425,15 @@ function moodDeltaAt(age: number, ids: Iterable<string>): number {
 }
 
 // 把一个 cost / gain 片段渲染成短标签（心情=隐藏分的相对增减，不暴露绝对值）。
+// #4 所有数字一律截断到小数点后一位（fmt1），避免累乘 wealthMul 出现长小数。
 function pieceText(p?: Partial<LifeDebuff>): string {
   if (!p) return '—'
   const parts: string[] = []
-  if (p.wealthMul != null && p.wealthMul !== 1) parts.push(`资产×${p.wealthMul}`)
-  if (p.eduDelta) parts.push(`学历${p.eduDelta > 0 ? '+' : ''}${p.eduDelta}`)
-  if (p.identityDelta) parts.push(`身份${p.identityDelta > 0 ? '+' : ''}${p.identityDelta}`)
-  if (p.bodyDelta) parts.push(`身体${p.bodyDelta > 0 ? '+' : ''}${p.bodyDelta}`)
-  if (p.moodDelta) parts.push(`心情${p.moodDelta > 0 ? '+' : ''}${p.moodDelta}`)
+  if (p.wealthMul != null && p.wealthMul !== 1) parts.push(`资产×${fmt1(p.wealthMul)}`)
+  if (p.eduDelta) parts.push(`学历${p.eduDelta > 0 ? '+' : ''}${fmt1(p.eduDelta)}`)
+  if (p.identityDelta) parts.push(`身份${p.identityDelta > 0 ? '+' : ''}${fmt1(p.identityDelta)}`)
+  if (p.bodyDelta) parts.push(`身体${p.bodyDelta > 0 ? '+' : ''}${fmt1(p.bodyDelta)}`)
+  if (p.moodDelta) parts.push(`心情${p.moodDelta > 0 ? '+' : ''}${fmt1(p.moodDelta)}`)
   return parts.length ? parts.join(' ') : '—'
 }
 
@@ -1486,12 +1548,25 @@ function deathAgeFor(ctx: MetricsCtx): number {
 export default function SimPage() {
   const [age, setAge] = useState<number>(0)
   // 选项驱动：isTimelinePlaying = 自动模式（定时随机替你选一张牌并进入下一年）。
-  const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(false)
-  const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(1)
+  // #1 默认开局即自动播放（确定值，避免 SSR 水合不一致）。
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState<boolean>(true)
+  // #1 默认 8 倍速。
+  const [timelineSpeed, setTimelineSpeed] = useState<PlaybackSpeed>(8)
   // 无有效选择（0 或 1 张牌）时的提示文案；非空即弹出“只能选默认”横幅。
   const [defaultNotice, setDefaultNotice] = useState<string | null>(null)
   // 人生复盘弹层开关：点“📜 人生复盘”按钮打开，复盘过去的选择如何塑造了这一生。
   const [showReview, setShowReview] = useState<boolean>(false)
+  // #5 移动端三页式：1=随机天赋设置页，2=自动播放+事件页，3=总结(复用复盘弹层)。
+  //    PC 端忽略此状态（CSS 媒体查询只在窄屏生效）。默认 1，且 isMobile 默认 false 避免 SSR 水合不一致。
+  const [mobilePage, setMobilePage] = useState<1 | 2 | 3>(1)
+  const [isMobile, setIsMobile] = useState<boolean>(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   // 防止一次推进过程中重复推进（手动选牌 500ms 内只推进一次）。
   const advancingRef = useRef(false)
   const [regionId, setRegionId] = useState<RegionId>(REGIONS[1].id)
@@ -1576,10 +1651,18 @@ export default function SimPage() {
     decisionsRef.current = decisions
   }, [decisions])
 
+  // #3 当前资产(万) 的实时缓存：供 poolAt 判断极富/破产专属卡是否进池。
+  //    在 render 中由 liveMetrics.wealth 同步写入（见下方），发牌 effect 读取。
+  const wealthRef = useRef<number>(0)
+
   // 某年龄当前可抽的卡池（在窗口期内、尚未选中、前置事件已满足、可排除指定 id）。
   // 垃圾卡多为无前置、窗口宽，始终在池中（不受天赋/教养影响）；链式卡需先选中前置才会出现。
   const reqMet = (c: LifeChoice) =>
     !c.requires || c.requires.every((r) => decisionsRef.current.has(r))
+  // #3 资产门槛：极富卡(minWealth)需当前资产 ≥ 门槛；破产卡(maxWealth)需当前资产 ≤ 上限。
+  const wealthMet = (c: LifeChoice) =>
+    (c.minWealth == null || wealthRef.current >= c.minWealth) &&
+    (c.maxWealth == null || wealthRef.current <= c.maxWealth)
   const poolAt = (year: number, exclude: string[]) =>
     LIFE_CHOICES.filter(
       (c) =>
@@ -1587,10 +1670,13 @@ export default function SimPage() {
         year <= c.ageEnd &&
         !decisionsRef.current.has(c.id) &&
         !exclude.includes(c.id) &&
-        reqMet(c),
+        reqMet(c) &&
+        wealthMet(c),
     )
 
   // 进入新的一年 → 重新发 4 张牌。人死后不再发牌。
+  // #2 窗口关联：若本年有"激活中"的机会窗口且其关联卡仍在池中，
+  //    保证手牌里至少出现一张关联卡，让右侧窗口能被左侧抽卡真正"抓住"。
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
@@ -1598,7 +1684,20 @@ export default function SimPage() {
       setHand([])
       return
     }
-    setHand(sampleN(poolAt(displayAge, []).map((c) => c.id), 4))
+    const pool = poolAt(displayAge, []).map((c) => c.id)
+    // 本年激活窗口的全部关联卡（仍在池中、未选中）。
+    const linkedInPool = OPPORTUNITY_WINDOWS.flatMap((w) =>
+      displayAge >= w.ageStart && displayAge <= w.ageEnd
+        ? (WINDOW_CARD_LINKS[w.id] ?? [])
+        : [],
+    ).filter((id) => pool.includes(id))
+    let dealt = sampleN(pool, 4)
+    if (linkedInPool.length > 0 && !dealt.some((id) => linkedInPool.includes(id))) {
+      // 手牌里没有任何关联卡 → 随机塞一张进来（替换最后一张）。
+      const pick = linkedInPool[Math.floor(Math.random() * linkedInPool.length)]
+      dealt = [pick, ...dealt.filter((id) => id !== pick)].slice(0, 4)
+    }
+    setHand(dealt)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayAge])
 
@@ -1640,6 +1739,11 @@ export default function SimPage() {
       : !c.worthy
       ? { name: '人性化', color: '#db2777' }
       : { name: '性价比高', color: '#047857' }
+    // #2 该卡是否关联到当前正激活的机会窗口（窗口期内才提示，过期不提示）。
+    const link = CARD_TO_WINDOW.get(c.id)
+    const linkWin = link ? OPPORTUNITY_WINDOWS.find((w) => w.id === link.windowId) : undefined
+    const linkActive =
+      !!linkWin && age >= linkWin.ageStart && age <= linkWin.ageEnd
     return (
       <button
         key={c.id}
@@ -1683,6 +1787,14 @@ export default function SimPage() {
           {selected && (
             <span style={{ fontSize: 10, color: 'white', background: col.color, padding: '1px 7px', borderRadius: 999, fontWeight: 700 }}>
               ✓ 已选中
+            </span>
+          )}
+          {linkActive && link && (
+            <span
+              title={`关联机会窗口：${link.title}`}
+              style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '1px 6px', borderRadius: 999, fontWeight: 700 }}
+            >
+              🎯 抓住窗口
             </span>
           )}
           {selected && (
@@ -1761,7 +1873,7 @@ export default function SimPage() {
   const pauseTimeline = () => setIsTimelinePlaying(false)
   const resumeTimeline = () => setIsTimelinePlaying(true)
   const resetTimeline = () => {
-    setIsTimelinePlaying(false)
+    setIsTimelinePlaying(true)
     setDefaultNotice(null)
     setDecisions(new Set())
     handYearRef.current = -1
@@ -1862,13 +1974,22 @@ export default function SimPage() {
     if (isTimelinePlaying && age >= deathAge) setIsTimelinePlaying(false)
   }, [age, deathAge, isTimelinePlaying])
 
+  // #5 移动端：人生走到尽头时，自动把第二页切换到"总结页面"(复盘弹层)。
+  useEffect(() => {
+    if (isMobile && age >= deathAge && mobilePage === 2) {
+      setShowReview(true)
+    }
+  }, [isMobile, age, deathAge, mobilePage])
+
   // 人死后指标全部冻结：用 min(当前年龄, 死亡年龄) 作为读取四维分的"有效年龄"。
   const isDead = age >= deathAge
   const metricAge = Math.min(age, deathAge)
 
   // —— 自动模式：定时随机替玩家选一张牌并进入下一年（选项驱动的自动版）——
   useEffect(() => {
+    // #5 移动端在"随机天赋设置页"(page1)时不推进，进入第二页才开始自动播放。
     if (!isTimelinePlaying || isDead) return
+    if (isMobile && mobilePage !== 2) return
     const ms = BASE_MS_PER_YEAR / timelineSpeed
     const timer = window.setTimeout(() => {
       const candidates = hand.filter((id) => !decisionsRef.current.has(id))
@@ -1879,7 +2000,7 @@ export default function SimPage() {
     }, ms)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTimelinePlaying, isDead, timelineSpeed, hand, age])
+  }, [isTimelinePlaying, isDead, timelineSpeed, hand, age, isMobile, mobilePage])
 
   // —— 手动模式 + 无有效选择（0 或 1 张牌）：弹"只能选默认"提示，3 秒后自动进入下一年 ——
   useEffect(() => {
@@ -1903,6 +2024,8 @@ export default function SimPage() {
 
   // 当前年龄、已叠加抉择 cost/gain 的四维分（状态卡显示用；死后冻结在死亡年龄）。
   const liveMetrics = metricsAt(metricAge, metricsCtx)
+  // #3 把当前资产同步进 ref，供发牌时的极富/破产专属卡门槛判断。
+  wealthRef.current = liveMetrics.wealth
   const wealthScore = fmt1(liveMetrics.wealth)
   const identityScore = liveMetrics.identity
   const educationScore = liveMetrics.education
@@ -2313,7 +2436,7 @@ export default function SimPage() {
     // lqs-sim-page: 标记 /sim 页根节点, 配合 globals.css 中
     // @media(min-width:1100px) .lqs-main:has(.lqs-sim-page) 让 /sim
     // 在 PC 上撑满 viewport, 不影响 / 首页 (layout.tsx 仍是 maxWidth:960).
-    <section className="lqs-sim-page" style={{ display: 'grid', gap: 16 }}>
+    <section className="lqs-sim-page" data-mp={mobilePage} style={{ display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 6 }}>
         <h1 className="lqs-sim-title" style={{ fontSize: 32, margin: 0 }}>人生模拟 Demo</h1>
         <p className="lqs-sim-lede" style={{ color: '#6b7280', margin: 0, lineHeight: 1.7 }}>
@@ -2333,7 +2456,8 @@ export default function SimPage() {
         <aside
           className="lqs-sim-aside"
           style={{
-            display: 'grid',
+            // #5 移动端 page2/3 隐藏设置面板（内联 display 优先级高于 CSS，需在此判断）。
+            display: isMobile && mobilePage !== 1 ? 'none' : 'grid',
             gap: 16,
             padding: 16,
             border: '1px solid #e5e7eb',
@@ -2644,10 +2768,75 @@ export default function SimPage() {
               天赋既用于筛选右侧人生窗口，也作为四维分的<strong>先天加成</strong>：选得越多底子越好，全不选则只剩出身与教养基底（可能为负）。
             </p>
           </div>
+          {/* #5 移动端 page1 底部：确定天赋 → 从 0 岁重新开局并进入自动播放页 */}
+          <button
+            type="button"
+            className="lqs-mobile-only"
+            onClick={() => {
+              resetTimeline()
+              setMobilePage(2)
+            }}
+            style={{
+              marginTop: 4,
+              padding: '14px 16px',
+              border: 'none',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg,#10b981,#059669)',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            ✅ 确定天赋，开始这一生 →
+          </button>
         </aside>
 
         {/* 主区 (alt-a: PC 1100px+ 切两列 — 左侧时间轴+状态, 右侧机会窗口直接进入首屏) */}
         <div className="lqs-sim-content">
+          {/* #5 移动端 page2 顶部导航：返回重选天赋 / 跳到总结页 */}
+          <div
+            className="lqs-mobile-only lqs-mobile-nav"
+            style={{ gap: 8, marginBottom: 4 }}
+          >
+            <button
+              type="button"
+              onClick={() => setMobilePage(1)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 10,
+                background: '#fff',
+                color: '#374151',
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ← 重选天赋
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReview(true)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                border: 'none',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              📜 查看人生总结
+            </button>
+          </div>
           <div className="lqs-sim-col-left">
           {/* 当前状态卡：资产 / 身份 / 学历 / 身体机能，红/绿涨跌可视化 */}
           <div
@@ -3290,6 +3479,10 @@ export default function SimPage() {
                   .map((id) => FAMILY_BACKGROUNDS.find((b) => b.id === id)?.name)
                   .filter(Boolean)
                   .join(' / ')
+                // #2 窗口 ↔ 抽卡关联状态：已把握(选过关联卡) / 本年可抽到(关联卡在手牌)。
+                const linkedCards = WINDOW_CARD_LINKS[win.id] ?? []
+                const linkGrasped = linkedCards.some((id) => decisions.has(id))
+                const linkInHand = linkedCards.some((id) => hand.includes(id))
                 return (
                   <li
                     key={win.id}
@@ -3325,6 +3518,15 @@ export default function SimPage() {
                         {palette.label}
                       </span>
                       <span style={{ fontWeight: 600 }}>{win.title}</span>
+                      {linkGrasped ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'white', background: '#047857', padding: '2px 8px', borderRadius: 999 }}>
+                          ✓ 已把握
+                        </span>
+                      ) : linkInHand ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '1px 7px', borderRadius: 999 }}>
+                          🎴 本年可抽到
+                        </span>
+                      ) : null}
                       <span style={{ color: '#6b7280', fontSize: 12 }}>
                         窗口 {win.ageStart}-{win.ageEnd} 岁
                       </span>

@@ -37,6 +37,8 @@ export type LifeChoice = {
   consequence: string // 后果文案（带黑色幽默）
   requires?: string[] // 前置事件：必须已选中这些 id，本卡才会进入抽卡池
   unlocks?: string[] // 后置事件：选中本卡后才会解锁的事件 id（用于链式提示）
+  minWealth?: number // 资产门槛：当前资产(万) ≥ 此值才进池（极富专属卡）
+  maxWealth?: number // 资产上限：当前资产(万) ≤ 此值才进池（破产 / 负债专属卡）
   extra?: Record<string, number | string | boolean> // 扩展字段（稀有度 / 标签 / 自定义参数等）
 }
 
@@ -1619,6 +1621,90 @@ export const LIFE_CHOICES: LifeChoice[] = [
     requires: ['breakup_heartbreak'],
     desc: '抵不住回忆，和前任破镜重圆。',
     consequence: '重蹈覆辙的概率很高：当初分开的原因，往往还在原地等着。',
+  },
+
+  // ——————— 💎 极富专属卡（资产 ≥ 500 万才进池）———————
+  {
+    id: 'family_office', emoji: '🏛️', name: '设立家族办公室', track: 'career',
+    ageStart: 35, ageEnd: 75, delayYears: 3, worthy: true, minWealth: 500,
+    cost: { wealthMul: 0.9, moodDelta: -3 },
+    gain: { wealthMul: 1.6, identityDelta: 14, moodDelta: 6 },
+    desc: '专业团队打理家族资产，跨代财富传承与税务筹划。',
+    consequence: '钱开始自己生钱：现金流脱离工资单，财富进入复利快车道。',
+  },
+  {
+    id: 'private_jet', emoji: '🛩️', name: '购入私人飞机', track: 'love',
+    ageStart: 38, ageEnd: 75, delayYears: 1, worthy: false, trash: true, minWealth: 800,
+    cost: { wealthMul: 0.6, moodDelta: -2 },
+    gain: { moodDelta: 16, identityDelta: 8 },
+    desc: '时间就是金钱，再贵的玩具也买得起。',
+    consequence: '极致的自由与排面：但养护费像无底洞，纯粹的炫耀性消费。',
+  },
+  {
+    id: 'name_charity', emoji: '🎗️', name: '冠名慈善基金', track: 'career',
+    ageStart: 40, ageEnd: 90, delayYears: 2, worthy: true, minWealth: 600,
+    cost: { wealthMul: 0.7, moodDelta: -2 },
+    gain: { identityDelta: 20, moodDelta: 12 },
+    desc: '以家族之名设立慈善基金，回馈社会、留下声望。',
+    consequence: '财富的最高级用法：声望与意义双收，钱花得有回响。',
+  },
+  {
+    id: 'capital_play', emoji: '📈', name: '资本运作并购', track: 'career',
+    ageStart: 35, ageEnd: 70, delayYears: 3, worthy: false, minWealth: 1000,
+    cost: { wealthMul: 0.7, moodDelta: -6 },
+    gain: { wealthMul: 2.2, identityDelta: 10, moodDelta: 4 },
+    desc: '杠杆收购、资本腾挪，富贵险中求的顶级游戏。',
+    consequence: '要么登顶要么爆仓：玩的是别人的钱与自己的命运，刺激到失眠。',
+  },
+  {
+    id: 'spendthrift_heir', emoji: '💸', name: '挥霍败家', track: 'love',
+    ageStart: 22, ageEnd: 60, delayYears: 1, worthy: false, trash: true, minWealth: 500,
+    cost: { wealthMul: 0.4, moodDelta: -1 },
+    gain: { moodDelta: 14 },
+    desc: '名表豪车、夜夜笙歌，富二代的快乐很简单。',
+    consequence: '由奢入俭难：花钱如流水，账户余额肉眼可见地缩水。',
+  },
+
+  // ——————— 🩸 破产 / 负债专属卡（资产 ≤ 0 万才进池）———————
+  {
+    id: 'loan_shark', emoji: '🦈', name: '借高利贷救急', track: 'career',
+    ageStart: 22, ageEnd: 70, delayYears: 1, worthy: false, trash: true, maxWealth: 0,
+    cost: { wealthMul: 1.3, moodDelta: -10, bodyDelta: -3 },
+    gain: { moodDelta: 4 },
+    desc: '走投无路，签下利滚利的借条饮鸩止渴。',
+    consequence: '窟窿越补越大：利息像滚雪球，从此被催收的电话支配。',
+  },
+  {
+    id: 'sell_house_survive', emoji: '🏚️', name: '卖房抵债', track: 'career',
+    ageStart: 28, ageEnd: 75, delayYears: 0, worthy: true, maxWealth: 0,
+    cost: { moodDelta: -12, identityDelta: -4 },
+    gain: { wealthMul: 0.5, moodDelta: 5 },
+    desc: '咬牙卖掉唯一的房产，先把窟窿填上。',
+    consequence: '断臂求生：失去了安身之所，却也卸下了压垮人的债务。',
+  },
+  {
+    id: 'bankruptcy_liquidation', emoji: '⚖️', name: '破产清算', track: 'career',
+    ageStart: 25, ageEnd: 75, delayYears: 1, worthy: true, maxWealth: -20,
+    cost: { moodDelta: -8, identityDelta: -8 },
+    gain: { wealthMul: 0.2, moodDelta: 8 },
+    desc: '申请个人破产，依法清算、重新做人。',
+    consequence: '法律给的喘息：信用归零、限制高消费，但终于能从头再来。',
+  },
+  {
+    id: 'rob_peter_pay_paul', emoji: '🔄', name: '拆东墙补西墙', track: 'career',
+    ageStart: 22, ageEnd: 70, delayYears: 1, worthy: false, trash: true, maxWealth: 0,
+    cost: { wealthMul: 1.15, moodDelta: -6, bodyDelta: -2 },
+    gain: { moodDelta: 3 },
+    desc: '这张卡还那张卡，靠多头借贷维持周转。',
+    consequence: '庞氏式自救：账面上还活着，实际离崩盘只差一个晚点。',
+  },
+  {
+    id: 'medical_crowdfund', emoji: '🤲', name: '众筹治病', track: 'love',
+    ageStart: 25, ageEnd: 80, delayYears: 0, worthy: true, event: true, maxWealth: 0,
+    cost: { moodDelta: -10, identityDelta: -3 },
+    gain: { wealthMul: 0.5, bodyDelta: 4, moodDelta: 6 },
+    desc: '掏空积蓄后，只能向陌生人求助续命。',
+    consequence: '人间自有温情在：素不相识的善意凑成救命钱，也尝尽世态炎凉。',
   },
 ]
 

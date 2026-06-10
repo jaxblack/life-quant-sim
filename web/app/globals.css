@@ -708,3 +708,21 @@ video {
     width: 100%;
   }
 }
+
+/* ----------------------- #5 移动端三页式 ----------------------- */
+/* 默认（PC / 平板）隐藏移动专属导航；窄屏才显示，并按 data-mp 切换页面。 */
+.lqs-mobile-only {
+  display: none;
+}
+@media (max-width: 768px) {
+  .lqs-mobile-only {
+    display: flex;
+  }
+  /* page1=设置(aside)，page2=自动播放+事件(content)。复盘弹层充当 page3。 */
+  .lqs-sim-page[data-mp='1'] .lqs-sim-content {
+    display: none;
+  }
+  .lqs-sim-page[data-mp='2'] .lqs-sim-aside {
+    display: none;
+  }
+}
