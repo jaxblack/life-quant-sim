@@ -1604,6 +1604,7 @@ export default function SimPage() {
     if (advancingRef.current) return
     if (decisionsRef.current.has(id)) return
     advancingRef.current = true
+    setFlashPickId(id)
     addDecision(id)
     window.setTimeout(() => {
       advanceYear()
@@ -1645,6 +1646,8 @@ export default function SimPage() {
   // —————— 抽卡机制：每过一岁出 4 张事件卡，四选一（不再重随），也可一键随机选中 ——————
   const [hand, setHand] = useState<string[]>([])
   const [showAllCards, setShowAllCards] = useState<boolean>(false)
+  // 刚被抽中的卡 id：用于给该卡播放一段“抽中”高亮脉冲动画（自动播放时尤其需要，否则看不清抽到哪张）。
+  const [flashPickId, setFlashPickId] = useState<string | null>(null)
   const handYearRef = useRef<number>(-1)
   const decisionsRef = useRef(decisions)
   useEffect(() => {
@@ -1680,6 +1683,8 @@ export default function SimPage() {
   useEffect(() => {
     if (handYearRef.current === displayAge) return
     handYearRef.current = displayAge
+    // 翻到新的一年：清掉上一年的“抽中”高亮。
+    setFlashPickId(null)
     if (displayAge >= deathAgeRef.current) {
       setHand([])
       return
@@ -1744,10 +1749,13 @@ export default function SimPage() {
     const linkWin = link ? OPPORTUNITY_WINDOWS.find((w) => w.id === link.windowId) : undefined
     const linkActive =
       !!linkWin && age >= linkWin.ageStart && age <= linkWin.ageEnd
+    // 刚（自动 / 手动）抽中的卡：加一段高亮脉冲动画，让“抽中哪张”一目了然。
+    const flashing = c.id === flashPickId
     return (
       <button
         key={c.id}
         type="button"
+        className={flashing ? 'lqs-card-flash' : undefined}
         disabled={locked}
         onClick={() => (onPick ?? toggleDecision)(c.id)}
         aria-pressed={selected}
@@ -1784,6 +1792,11 @@ export default function SimPage() {
           <span style={{ color: '#6b7280', fontSize: 11 }}>
             {c.ageStart}-{c.ageEnd}岁{c.delayYears > 0 ? ` · ${c.delayYears}年后兑现` : ''}
           </span>
+          {flashing && (
+            <span className="lqs-flash-badge" style={{ fontSize: 10, color: 'white', background: '#f59e0b', padding: '1px 7px', borderRadius: 999, fontWeight: 800 }}>
+              🎴 抽中
+            </span>
+          )}
           {selected && (
             <span style={{ fontSize: 10, color: 'white', background: col.color, padding: '1px 7px', borderRadius: 999, fontWeight: 700 }}>
               ✓ 已选中
@@ -1991,14 +2004,23 @@ export default function SimPage() {
     if (!isTimelinePlaying || isDead) return
     if (isMobile && mobilePage !== 2) return
     const ms = BASE_MS_PER_YEAR / timelineSpeed
-    const timer = window.setTimeout(() => {
+    // 先在“翻页前”选牌并高亮该卡（showMs 时长），再进入下一年；整体节奏仍≈ ms/年。
+    const showMs = Math.min(ms * 0.5, 450)
+    const pickAt = Math.max(0, ms - showMs)
+    let advanceTimer: number | undefined
+    const pickTimer = window.setTimeout(() => {
       const candidates = hand.filter((id) => !decisionsRef.current.has(id))
       if (candidates.length > 0) {
-        addDecision(candidates[Math.floor(Math.random() * candidates.length)])
+        const pick = candidates[Math.floor(Math.random() * candidates.length)]
+        setFlashPickId(pick) // 触发“抽中”脉冲动画
+        addDecision(pick)
       }
-      advanceYear()
-    }, ms)
-    return () => window.clearTimeout(timer)
+      advanceTimer = window.setTimeout(() => advanceYear(), showMs)
+    }, pickAt)
+    return () => {
+      window.clearTimeout(pickTimer)
+      if (advanceTimer !== undefined) window.clearTimeout(advanceTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTimelinePlaying, isDead, timelineSpeed, hand, age, isMobile, mobilePage])
 

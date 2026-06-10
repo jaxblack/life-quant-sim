@@ -726,3 +726,52 @@ video {
     display: none;
   }
 }
+
+/* ----------------------- 抽中卡高亮动画 ----------------------- */
+/* 自动/手动抽牌命中时，给该卡一段琥珀色脉冲 + 轻微放大，让“抽中哪张”一眼可见。 */
+@keyframes lqsCardFlash {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  18% {
+    transform: scale(1.045);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.55), 0 12px 28px rgba(245, 158, 11, 0.45);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.28), 0 6px 16px rgba(245, 158, 11, 0.22);
+  }
+}
+.lqs-card-flash {
+  animation: lqsCardFlash 0.5s ease-out;
+  border-color: #f59e0b !important;
+  position: relative;
+  z-index: 1;
+}
+@keyframes lqsBadgePop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.lqs-flash-badge {
+  display: inline-block;
+  animation: lqsBadgePop 0.4s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lqs-card-flash {
+    animation: none;
+  }
+  .lqs-flash-badge {
+    animation: none;
+  }
+}
