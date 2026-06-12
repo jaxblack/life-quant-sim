@@ -21,6 +21,12 @@
 
 🚧 **早期 scaffold（Phase 1）** —— 仅包含目录骨架、路线图与 schema 草案，前端为占位页面。引擎与真实模拟将在 R2 起逐步填充。
 
+## Recent runs
+
+> 最近 5 次自动 demo（由 SkyPool plan 触发），按时间倒序。
+
+- 2026-06-06 · plan `fb94242b` · 0-100岁量化人生时间轴 · ![demo](docs/runs/2026-06-06-fb94242b.png)
+
 ## Quickstart
 
 ### 在线访问
